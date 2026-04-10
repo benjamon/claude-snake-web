@@ -543,7 +543,7 @@ window.addEventListener('keydown', e => {
 // ================================================================
 // TOUCH CONTROLS
 // ================================================================
-const hasTouch = navigator.maxTouchPoints > 0;
+const hasTouch = true; // always use button UI; keyboard shortcuts still work via keydown
 
 // Touch zones — cleared each frame, populated during draw
 let touchZones = [];
@@ -561,7 +561,7 @@ nameInput.setAttribute('autocomplete','off');
 nameInput.setAttribute('autocorrect','off');
 nameInput.setAttribute('autocapitalize','none');
 nameInput.setAttribute('spellcheck','false');
-nameInput.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-100px;left:0;border:none;outline:none;';
+nameInput.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;font-size:16px;border:none;outline:none;';
 document.body.appendChild(nameInput);
 let nameInputActive = false;
 
@@ -596,29 +596,42 @@ function focusNameInput() {
 let swipeX0 = 0, swipeY0 = 0;
 const SWIPE_MIN = 30;
 
+// touchstart: fire zones immediately for menu/UI states so focus() works on iOS Safari,
+// and record swipe origin for play-state direction input.
 canvas.addEventListener('touchstart', e => {
   e.preventDefault(); ensureAudio();
   const t = e.touches[0]; swipeX0 = t.clientX; swipeY0 = t.clientY;
+  // Non-play: act on touchstart so input.focus() is called within this user gesture
+  if (state !== S.PLAY) hitZone(t.clientX, t.clientY);
 }, {passive: false});
 
+// touchend: handle play-state swipes and in-game button taps
 canvas.addEventListener('touchend', e => {
   e.preventDefault();
   if (!e.changedTouches.length) return;
   const t = e.changedTouches[0];
   const dx = t.clientX - swipeX0, dy = t.clientY - swipeY0;
   const ax = Math.abs(dx), ay = Math.abs(dy);
-  // Swipe in PLAY → queue direction
-  if (state === S.PLAY && startDelay <= 0 && (ax > SWIPE_MIN || ay > SWIPE_MIN)) {
-    let d;
-    if (ax > ay) d = dx > 0 ? {x:1,y:0} : {x:-1,y:0};
-    else         d = dy > 0 ? {x:0,y:1} : {x:0,y:-1};
-    const last = inputQ.length ? inputQ[inputQ.length-1] : dir;
-    if (d.x !== -last.x || d.y !== -last.y)
-      if (d.x !== last.x || d.y !== last.y) if (inputQ.length < 3) inputQ.push(d);
-    return;
+  if (state === S.PLAY) {
+    if (startDelay <= 0 && (ax > SWIPE_MIN || ay > SWIPE_MIN)) {
+      // Swipe → queue direction
+      let d;
+      if (ax > ay) d = dx > 0 ? {x:1,y:0} : {x:-1,y:0};
+      else         d = dy > 0 ? {x:0,y:1} : {x:0,y:-1};
+      const last = inputQ.length ? inputQ[inputQ.length-1] : dir;
+      if (d.x !== -last.x || d.y !== -last.y)
+        if (d.x !== last.x || d.y !== last.y) if (inputQ.length < 3) inputQ.push(d);
+      return;
+    }
+    hitZone(t.clientX, t.clientY); // tap on in-game buttons (tunnel, menu)
   }
-  hitZone(t.clientX, t.clientY);
 }, {passive: false});
+
+// Mouse click support (desktop + touchscreen laptops)
+canvas.addEventListener('click', e => {
+  ensureAudio();
+  hitZone(e.clientX, e.clientY);
+});
 
 // ================================================================
 // PALETTE EDITOR STATE
