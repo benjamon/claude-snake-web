@@ -145,8 +145,16 @@ function makeOsc(type='sine', freq, start, stop, gain, gStart=null, gEnd=null, f
 }
 
 function sndEat() {
-  ensureAudio(); const t = audioCtx.currentTime;
-  makeOsc('sine', 300, t, t+0.10, 0.4, 0, 0, 1050);
+  ensureAudio(); const t = audioCtx.currentTime, dur = 0.10;
+  const osc = audioCtx.createOscillator();
+  const g   = audioCtx.createGain();
+  osc.connect(g); g.connect(masterGain);
+  osc.frequency.setValueAtTime(300, t);
+  osc.frequency.linearRampToValueAtTime(1050, t+dur);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.50, t+dur*0.08);
+  g.gain.linearRampToValueAtTime(0, t+dur);
+  osc.start(t); osc.stop(t+dur);
 }
 function sndDie() {
   ensureAudio(); const t = audioCtx.currentTime;
@@ -183,15 +191,22 @@ function sndPortal() {
   osc.start(t); osc.stop(t+0.45);
 }
 function sndTunnelPickup() {
-  ensureAudio(); const t = audioCtx.currentTime;
-  makeOsc('sine', 600, t, t+0.18, 0.3, 0, 0, 2400);
+  ensureAudio(); const t = audioCtx.currentTime, dur = 0.18;
+  const osc = audioCtx.createOscillator();
+  const g   = audioCtx.createGain();
+  osc.connect(g); g.connect(masterGain);
+  osc.frequency.setValueAtTime(600, t);
+  osc.frequency.linearRampToValueAtTime(2400, t+dur);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.35, t+dur*0.06);
+  g.gain.linearRampToValueAtTime(0, t+dur);
+  osc.start(t); osc.stop(t+dur);
 }
 function sndTunnelActivate() {
   ensureAudio(); const t = audioCtx.currentTime;
   // thump
   makeOsc('sine', 80, t, t+0.15, 0.5, 0.5, 0.001, 40);
-  // buzz
-  makeOsc('sawtooth', 300, t, t+0.30, 0, 0, 0, 900);
+  // buzz (written explicitly — makeOsc can't express a mid-envelope ramp-up)
   const osc = audioCtx.createOscillator();
   const g   = audioCtx.createGain();
   osc.type = 'sawtooth'; osc.connect(g); g.connect(masterGain);
@@ -219,42 +234,80 @@ function sndHaloSave() {
   });
 }
 
-// ---- Background music (procedural loop) ----
-const BG_BPM = 120;
-const BG_SPB  = 60 / BG_BPM;            // seconds per beat
-const BG_LOOP = 8 * BG_SPB * 1000;      // loop length ms
+// ---- Background music ----
+// Tries to load bgmusic.ogg / bgmusic.mp3 / bgmusic.wav from the same directory.
+// Falls back to a procedural synth loop if no file is found.
+
+let bgRawBuffer = null;   // fetched ArrayBuffer (before audio context exists)
+let bgAudioBuffer = null; // decoded AudioBuffer
+let bgSourceNode = null;  // currently playing BufferSourceNode
+let bgRunning = false, bgTimer = null;
+
+// Pre-fetch the audio file immediately (no audio context needed yet)
+(async () => {
+  for (const name of ['bgmusic.ogg','bgmusic.mp3','bgmusic.wav']) {
+    try {
+      const r = await fetch(name);
+      if (!r.ok) continue;
+      bgRawBuffer = await r.arrayBuffer();
+      break;
+    } catch(e) {}
+  }
+})();
+
+async function decodeBgMusicIfNeeded() {
+  if (bgAudioBuffer || !bgRawBuffer || !audioCtx) return;
+  try {
+    // decodeAudioData consumes the buffer, so slice a copy
+    bgAudioBuffer = await audioCtx.decodeAudioData(bgRawBuffer.slice(0));
+  } catch(e) { bgRawBuffer = null; } // corrupt file — fall back to synth
+}
+
+// Procedural fallback
+const BG_BPM = 120, BG_SPB = 60/BG_BPM, BG_LOOP = 8*BG_SPB*1000;
 const BG_MEL  = [[261.63,0,0.85],[329.63,1,0.85],[392.00,2,0.85],[523.25,3,0.85],
                  [392.00,4,0.85],[329.63,5,0.85],[261.63,6,1.80]];
 const BG_BASS = [[130.81,0,0.45],[130.81,2,0.45],[98.00,4,0.45],[130.81,6,0.45]];
-
-let bgRunning = false, bgTimer = null;
 
 function bgScheduleLoop() {
   if (!bgRunning || !audioCtx) return;
   const now = audioCtx.currentTime;
   const addNote = (freq, beat, durBeats, amp) => {
-    const t   = now + beat * BG_SPB;
-    const dur = durBeats * BG_SPB * 0.85;
-    const osc = audioCtx.createOscillator();
-    const g   = audioCtx.createGain();
+    const t = now + beat*BG_SPB, dur = durBeats*BG_SPB*0.85;
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
     osc.connect(g); g.connect(masterGain);
     osc.frequency.value = freq;
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(amp, t + 0.02);
-    g.gain.setValueAtTime(amp, t + dur*0.65);
-    g.gain.linearRampToValueAtTime(0, t + dur);
-    osc.start(t); osc.stop(t + dur + 0.05);
+    g.gain.linearRampToValueAtTime(amp, t+0.02);
+    g.gain.setValueAtTime(amp, t+dur*0.65);
+    g.gain.linearRampToValueAtTime(0, t+dur);
+    osc.start(t); osc.stop(t+dur+0.05);
   };
-  BG_MEL.forEach(([f,b,d])  => addNote(f, b, d, 0.14));
-  BG_BASS.forEach(([f,b,d]) => addNote(f, b, d, 0.20));
+  BG_MEL.forEach(([f,b,d])  => addNote(f,b,d,0.14));
+  BG_BASS.forEach(([f,b,d]) => addNote(f,b,d,0.20));
   bgTimer = setTimeout(bgScheduleLoop, BG_LOOP - 100);
 }
-function startBgMusic() {
+
+async function startBgMusic() {
   if (bgRunning) return;
-  ensureAudio(); bgRunning = true; bgScheduleLoop();
+  ensureAudio();
+  bgRunning = true;
+  await decodeBgMusicIfNeeded();
+  if (bgAudioBuffer) {
+    // File-based looping playback
+    bgSourceNode = audioCtx.createBufferSource();
+    bgSourceNode.buffer = bgAudioBuffer;
+    bgSourceNode.loop = true;
+    bgSourceNode.connect(masterGain);
+    bgSourceNode.start();
+  } else {
+    // Procedural fallback
+    bgScheduleLoop();
+  }
 }
 function stopBgMusic() {
   bgRunning = false;
+  if (bgSourceNode) { try { bgSourceNode.stop(); } catch(e) {} bgSourceNode = null; }
   if (bgTimer) { clearTimeout(bgTimer); bgTimer = null; }
 }
 
@@ -813,17 +866,23 @@ function drawGame() {
       const cx=cell.x*gCell+gCell/2, cy=cell.y*gCell+gCell/2;
       const maxR=gCell*0.47;
       const pulse=(Math.sin(gTime*3.5)+1)*0.5;
-      const lw=Math.max(1,gCell/9);
+      const lw=Math.max(2,gCell/7);
+      const [pr,pg,pb]=pp.color;
       for(let ring=0;ring<4;ring++) {
         const r=maxR*(1-ring/4);
         const bright=ring%2===0;
-        const a=bright?0.80-ring*0.10:0.38-ring*0.05;
-        const [pr,pg,pb]=pp.color;
-        const fac=bright?1:0.5;
-        ctx.strokeStyle=`rgba(${Math.min(255,pr*fac|0)},${Math.min(255,pg*fac|0)},${Math.min(255,pb*fac|0)},${a})`;
+        const a=bright?0.95-ring*0.10:0.55-ring*0.05;
+        const fac=bright?1:0.6;
+        const rc=Math.min(255,pr*fac+pulse*40)|0;
+        const gc=Math.min(255,pg*fac+pulse*20)|0;
+        const bc=Math.min(255,pb*fac+pulse*40)|0;
+        ctx.strokeStyle=`rgba(${rc},${gc},${bc},${a})`;
         ctx.lineWidth=lw;
         ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
       }
+      // Bright center dot
+      ctx.fillStyle=`rgba(${Math.min(255,pr+100)},${Math.min(255,pg+100)},${Math.min(255,pb+100)},${0.5+pulse*0.4})`;
+      ctx.beginPath(); ctx.arc(cx,cy,lw,0,Math.PI*2); ctx.fill();
     };
     drawPortal(pp.a); drawPortal(pp.b);
   }
