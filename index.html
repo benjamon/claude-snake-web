@@ -236,31 +236,20 @@ function sndHaloSave() {
 
 // ---- Background music ----
 // Tries to load bgmusic.ogg / bgmusic.mp3 / bgmusic.wav from the same directory.
-// Falls back to a procedural synth loop if no file is found.
+// Falls back to a procedural synth loop if no file is found or on file:// protocol.
 
-let bgRawBuffer = null;   // fetched ArrayBuffer (before audio context exists)
-let bgAudioBuffer = null; // decoded AudioBuffer
-let bgSourceNode = null;  // currently playing BufferSourceNode
+let bgAudio = null;      // HTMLAudioElement for file playback
 let bgRunning = false, bgTimer = null;
+let bgUsingFile = false;
 
-// Pre-fetch the audio file immediately (no audio context needed yet)
-(async () => {
-  for (const name of ['bgmusic.ogg','bgmusic.mp3','bgmusic.wav']) {
-    try {
-      const r = await fetch(name);
-      if (!r.ok) continue;
-      bgRawBuffer = await r.arrayBuffer();
-      break;
-    } catch(e) {}
+function bgPickSrc() {
+  // Return the first format this browser claims to support
+  const tmp = new Audio();
+  const candidates = [['bgmusic.ogg','audio/ogg'],['bgmusic.mp3','audio/mpeg'],['bgmusic.wav','audio/wav']];
+  for (const [file, mime] of candidates) {
+    if (tmp.canPlayType(mime) !== '') return file;
   }
-})();
-
-async function decodeBgMusicIfNeeded() {
-  if (bgAudioBuffer || !bgRawBuffer || !audioCtx) return;
-  try {
-    // decodeAudioData consumes the buffer, so slice a copy
-    bgAudioBuffer = await audioCtx.decodeAudioData(bgRawBuffer.slice(0));
-  } catch(e) { bgRawBuffer = null; } // corrupt file — fall back to synth
+  return null;
 }
 
 // Procedural fallback
@@ -290,24 +279,31 @@ function bgScheduleLoop() {
 
 async function startBgMusic() {
   if (bgRunning) return;
-  ensureAudio();
-  bgRunning = true;
-  await decodeBgMusicIfNeeded();
-  if (bgAudioBuffer) {
-    // File-based looping playback
-    bgSourceNode = audioCtx.createBufferSource();
-    bgSourceNode.buffer = bgAudioBuffer;
-    bgSourceNode.loop = true;
-    bgSourceNode.connect(masterGain);
-    bgSourceNode.start();
-  } else {
-    // Procedural fallback
-    bgScheduleLoop();
+  ensureAudio(); bgRunning = true;
+
+  const src = bgPickSrc();
+  if (src) {
+    if (!bgAudio) {
+      bgAudio = new Audio();
+      bgAudio.loop = true;
+      bgAudio.volume = 0.45; // match masterGain level
+      bgAudio.src = src;
+    }
+    try {
+      await bgAudio.play();
+      bgUsingFile = true;
+      return;
+    } catch(e) {
+      // File not found, network error, or blocked — fall through to synth
+      console.warn('[bgm] file playback failed, using synth:', e.message);
+    }
   }
+  bgScheduleLoop();
 }
+
 function stopBgMusic() {
   bgRunning = false;
-  if (bgSourceNode) { try { bgSourceNode.stop(); } catch(e) {} bgSourceNode = null; }
+  if (bgAudio && bgUsingFile) { bgAudio.pause(); }
   if (bgTimer) { clearTimeout(bgTimer); bgTimer = null; }
 }
 
