@@ -756,22 +756,23 @@ function drawMenu() {
 
   // Leaderboard
   if (onlineReady&&onlineScores.length) {
-    const colW=Math.round(W*0.38);
+    const tLb=TS(20), tLbRow=TS(19);
+    const colW=Math.round(W*0.42);
     const lx=(W-colW)/2;
-    drawText('LEADERBOARD',lx,y,tSmall,rgb('DIM'));
-    y+=tSmall+TS(6);
+    drawText('LEADERBOARD',lx,y,tLb,rgb('DIM'));
+    y+=tLb+TS(8);
     const show=Math.min(onlineScores.length,6);
     for(let i=0;i<show;i++){
       const e=onlineScores[i];
       const isMe=e.name===playerName;
       const col=isMe?'#ffdd44':rgb('DIM');
       const rank=`${i+1}.`;
-      drawText(rank,lx,y,tHint,col);
-      drawText(e.name,lx+measured(rank,tHint)+8,y,tHint,col);
-      drawText(String(e.score),lx+colW,y,tHint,col,'right','top');
-      y+=tHint+TS(4);
+      drawText(rank,lx,y,tLbRow,col);
+      drawText(e.name,lx+measured(rank,tLbRow)+8,y,tLbRow,col);
+      drawText(String(e.score),lx+colW,y,tLbRow,col,'right','top');
+      y+=tLbRow+TS(6);
     }
-    y+=TS(10);
+    y+=TS(12);
   }
 
   // Personal best
@@ -1100,12 +1101,13 @@ function drawDead() {
 
   if(onlineReady&&onlineScores.length) {
     y+=TS(8);
-    centered('LEADERBOARD',y,tSm,rgb('DIM')); y+=tSm+TS(6);
+    const tLb=TS(20), tLbRow=TS(19);
+    centered('LEADERBOARD',y,tLb,rgb('DIM')); y+=tLb+TS(6);
     const show=Math.min(onlineScores.length,5);
     for(let i=0;i<show;i++) {
       const e=onlineScores[i];
       const col=e.name===playerName?'#ffdd44':rgb('DIM');
-      centered(`${i+1}. ${e.name}   ${e.score}`,y,tHint,col); y+=tHint+TS(4);
+      centered(`${i+1}. ${e.name}   ${e.score}`,y,tLbRow,col); y+=tLbRow+TS(4);
     }
     y+=TS(10);
   }
