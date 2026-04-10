@@ -353,13 +353,14 @@ fetchLeaderboard();
 let particles = [], floatTexts = [];
 
 function burst(bx, by, count, spMin, spMax, szMin, szMax, liMin, liMax, colors) {
+  const SP=2.0, SZ=2.0, LI=2.0;
   for (let i = 0; i < count; i++) {
     const ang = Math.random() * Math.PI * 2;
-    const sp  = spMin + Math.random()*(spMax-spMin);
+    const sp  = (spMin + Math.random()*(spMax-spMin)) * SP;
     const col = colors[Math.floor(Math.random()*colors.length)];
-    const li  = liMin + Math.random()*(liMax-liMin);
+    const li  = (liMin + Math.random()*(liMax-liMin)) * LI;
     particles.push({ x:bx, y:by, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp,
-      sz: szMin+Math.random()*(szMax-szMin), li, liMax:li, col });
+      sz: (szMin+Math.random()*(szMax-szMin)) * SZ, li, liMax:li, col });
   }
 }
 function floatText(bx, by, text, col) {
@@ -441,7 +442,9 @@ function spawnPortalPair() {
       const cb={x:rnd(1,COLS-2), y:rnd(1,ROWS-2)};
       if (Math.abs(cb.x-ca.x)+Math.abs(cb.y-ca.y)<5) continue;
       if (cellOccupied(cb)) continue;
-      portalPairs.push({a:ca, b:cb, color});
+      portalPairs.push({a:ca, b:cb, color, spawnTime:gTime});
+      burst(ca.x*gCell+gCell/2, ca.y*gCell+gCell/2, 10, 40,160, 3,8, 0.3,0.6, [color,[255,255,255]]);
+      burst(cb.x*gCell+gCell/2, cb.y*gCell+gCell/2, 10, 40,160, 3,8, 0.3,0.6, [color,[255,255,255]]);
       return;
     }
   }
@@ -846,14 +849,20 @@ function drawGame() {
     ctx.stroke();
   }
 
-  // Portal connecting lines
+  // Portal connecting lines — grow from each end toward center over 0.8s
   const linePx=Math.max(2,Math.round(5*gScale));
   for(const pp of portalPairs) {
+    const t=Math.min(1,(gTime-pp.spawnTime)/0.8);
+    const ax=pp.a.x*gCell+gCell/2, ay=pp.a.y*gCell+gCell/2;
+    const bx=pp.b.x*gCell+gCell/2, by=pp.b.y*gCell+gCell/2;
+    // Each segment grows from its portal to the midpoint
+    const eax=ax+(bx-ax)*t*0.5, eay=ay+(by-ay)*t*0.5;
+    const ebx=bx+(ax-bx)*t*0.5, eby=by+(ay-by)*t*0.5;
     ctx.strokeStyle=rgbA(pp.color,0.62);
     ctx.lineWidth=linePx;
     ctx.beginPath();
-    ctx.moveTo(pp.a.x*gCell+gCell/2, pp.a.y*gCell+gCell/2);
-    ctx.lineTo(pp.b.x*gCell+gCell/2, pp.b.y*gCell+gCell/2);
+    ctx.moveTo(ax,ay); ctx.lineTo(eax,eay);
+    ctx.moveTo(bx,by); ctx.lineTo(ebx,eby);
     ctx.stroke();
   }
 
