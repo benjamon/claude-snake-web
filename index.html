@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <title>Snake</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; background: #121212; overflow: hidden; }
-canvas { display: block; }
+canvas { display: block; touch-action: none; }
+body { touch-action: none; }
 </style>
 </head>
 <body>
@@ -516,6 +517,7 @@ let nameBuf = playerName || '';
 let nameEditing = false; // for in-game name change
 
 window.addEventListener('keydown', e => {
+  if (nameInputActive) return;
   if (state===S.SETUP) {
     if (e.key==='Backspace') { nameBuf=nameBuf.slice(0,-1); e.preventDefault(); return; }
     if (e.key==='Enter'&&nameBuf.trim()) {
@@ -537,6 +539,86 @@ window.addEventListener('keydown', e => {
     e.preventDefault();
   }
 });
+
+// ================================================================
+// TOUCH CONTROLS
+// ================================================================
+const hasTouch = navigator.maxTouchPoints > 0;
+
+// Touch zones — cleared each frame, populated during draw
+let touchZones = [];
+function addZone(x, y, w, h, action) { touchZones.push({x,y,w,h,action}); }
+function hitZone(cx, cy) {
+  for (const z of touchZones)
+    if (cx>=z.x && cx<=z.x+z.w && cy>=z.y && cy<=z.y+z.h) { z.action(); return true; }
+  return false;
+}
+
+// Hidden <input> so the native mobile keyboard appears for text entry
+const nameInput = document.createElement('input');
+nameInput.type = 'text';
+nameInput.setAttribute('autocomplete','off');
+nameInput.setAttribute('autocorrect','off');
+nameInput.setAttribute('autocapitalize','none');
+nameInput.setAttribute('spellcheck','false');
+nameInput.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-100px;left:0;border:none;outline:none;';
+document.body.appendChild(nameInput);
+let nameInputActive = false;
+
+nameInput.addEventListener('input', () => {
+  nameBuf = nameInput.value.slice(0, 16);
+});
+nameInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (state === S.SETUP) {
+      if (nameBuf.trim()) { playerName=nameBuf.trim(); saveConfig(); state=S.MENU; startBgMusic(); }
+    } else if (nameEditing) {
+      if (nameBuf.trim()) { playerName=nameBuf.trim(); saveConfig(); }
+      nameEditing = false;
+    }
+    nameInputActive = false; nameInput.blur(); e.preventDefault();
+  }
+  if (e.key === 'Escape') {
+    nameEditing = false; nameInputActive = false; nameInput.blur(); e.preventDefault();
+  }
+});
+nameInput.addEventListener('blur', () => { nameInputActive = false; });
+
+function focusNameInput() {
+  nameInputActive = true;
+  nameInput.value = nameBuf;
+  nameInput.style.pointerEvents = 'auto';
+  nameInput.focus();
+  nameInput.style.pointerEvents = 'none';
+}
+
+// Swipe for movement, tap for zones
+let swipeX0 = 0, swipeY0 = 0;
+const SWIPE_MIN = 30;
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault(); ensureAudio();
+  const t = e.touches[0]; swipeX0 = t.clientX; swipeY0 = t.clientY;
+}, {passive: false});
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (!e.changedTouches.length) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - swipeX0, dy = t.clientY - swipeY0;
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  // Swipe in PLAY → queue direction
+  if (state === S.PLAY && startDelay <= 0 && (ax > SWIPE_MIN || ay > SWIPE_MIN)) {
+    let d;
+    if (ax > ay) d = dx > 0 ? {x:1,y:0} : {x:-1,y:0};
+    else         d = dy > 0 ? {x:0,y:1} : {x:0,y:-1};
+    const last = inputQ.length ? inputQ[inputQ.length-1] : dir;
+    if (d.x !== -last.x || d.y !== -last.y)
+      if (d.x !== last.x || d.y !== last.y) if (inputQ.length < 3) inputQ.push(d);
+    return;
+  }
+  hitZone(t.clientX, t.clientY);
+}, {passive: false});
 
 // ================================================================
 // PALETTE EDITOR STATE
@@ -714,10 +796,32 @@ function drawText(text, x, y, sz, col, align='left', base='top') {
 function centered(text,y,sz,col) { drawText(text,W/2,y,sz,col,'center','top'); }
 function measured(text,sz) { ctx.font=`bold ${sz}px monospace`; return ctx.measureText(text).width; }
 
+function drawBtn(label, x, y, w, h, fillCol, textCol, action) {
+  const r = Math.min(8, h/4);
+  ctx.fillStyle = fillCol;
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+  ctx.fill();
+  const sz = Math.min(Math.round(h*0.50), TS(20));
+  ctx.font = `bold ${sz}px monospace`;
+  ctx.fillStyle = textCol; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, x+w/2, y+h/2);
+  if (action) addZone(x, y, w, h, action);
+}
+
 // ================================================================
 // DRAW
 // ================================================================
 function draw() {
+  touchZones.length = 0;
   // Background
   ctx.fillStyle=rgb('BG');
   ctx.fillRect(0,0,W,H);
@@ -738,12 +842,25 @@ function drawSetup() {
   centered('Enter your name',y,tNorm,rgb('DIM')); y+=tNorm+TS(20);
   const cursor=(Math.floor(gTime*2)%2)?'_':' ';
   const nm=nameBuf+cursor;
-  const nw=measured(nm,tNorm)+20;
-  const nx=(W-nw)/2;
-  ctx.fillStyle='rgba(255,255,255,0.06)';
-  ctx.fillRect(nx,y,nw,tNorm+8);
-  centered(nm,y+4,tNorm,'#fff'); y+=tNorm+TS(32);
-  centered('Press ENTER to continue',y,tHint,rgb('DIM'));
+  const nw=Math.max(measured(nm,tNorm)+40, W*0.5)|0;
+  const nx=(W-nw)/2|0;
+  const nh=tNorm+16;
+  ctx.fillStyle='rgba(255,255,255,0.09)';
+  ctx.fillRect(nx,y,nw,nh);
+  ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.lineWidth=1;
+  ctx.strokeRect(nx,y,nw,nh);
+  centered(nm,y+(nh-tNorm)/2,tNorm,'#fff');
+  addZone(nx,y,nw,nh, ()=>focusNameInput());
+  y+=nh+TS(24);
+  const bw=Math.min(260,W*0.6)|0, bh=Math.max(44,TS(38))|0;
+  const bx=(W-bw)/2|0;
+  const canGo=nameBuf.trim().length>0;
+  drawBtn('CONTINUE \u25b6', bx, y, bw, bh,
+    canGo?'rgba(80,180,80,0.88)':'rgba(55,55,55,0.55)',
+    canGo?'#fff':'rgba(130,130,130,0.5)',
+    canGo?()=>{playerName=nameBuf.trim();saveConfig();state=S.MENU;startBgMusic();nameInputActive=false;nameInput.blur();}:null
+  );
+  if (!hasTouch) { y+=bh+TS(10); centered('Press ENTER to continue',y,tHint,rgb('DIM')); }
 }
 
 function drawMenu() {
@@ -778,18 +895,54 @@ function drawMenu() {
   centered(`Personal Best: ${personalBest}`,y,tSmall,'#dddd44'); y+=tSmall+TS(16);
 
   // Palette indicator
-  centered(`< ${PALETTES[palIdx].name} >  (↑↓ to change)`,y,tSmall,rgb('DIM')); y+=tSmall+TS(10);
-
-  // Player
-  if(!nameEditing) {
-    centered(`Player: ${playerName}  [N to rename]`,y,tHint,rgb('DIM')); y+=tHint+TS(18);
+  if (hasTouch) {
+    const arW=Math.max(40,TS(36)), arH=Math.max(40,TS(34)), gap=TS(10);
+    const nameW=measured(PALETTES[palIdx].name,tSmall);
+    const lax=(W/2-nameW/2-gap-arW)|0, rax=(W/2+nameW/2+gap)|0;
+    drawBtn('\u25c4',lax,y,arW,arH,'rgba(40,40,70,0.8)',rgb('DIM'),()=>{palIdx=(palIdx-1+PALETTES.length)%PALETTES.length;applyPalette(palIdx);});
+    centered(PALETTES[palIdx].name,(y+(arH-tSmall)/2)|0,tSmall,rgb('DIM'));
+    drawBtn('\u25ba',rax,y,arW,arH,'rgba(40,40,70,0.8)',rgb('DIM'),()=>{palIdx=(palIdx+1)%PALETTES.length;applyPalette(palIdx);});
+    y+=arH+TS(8);
   } else {
-    const cursor=(Math.floor(gTime*2)%2)?'_':' ';
-    centered(`Name: ${nameBuf}${cursor}`,y,tSmall,'#fff'); y+=tSmall+TS(18);
+    centered(`< ${PALETTES[palIdx].name} >  (↑↓ to change)`,y,tSmall,rgb('DIM')); y+=tSmall+TS(10);
   }
 
-  centered('PRESS ENTER TO PLAY',y,tNorm,'#fff'); y+=tNorm+TS(10);
-  centered('P: palette editor',y,tHint,rgb('DIM'));
+  // Player
+  if (!nameEditing) {
+    if (hasTouch) {
+      const nh=Math.max(36,TS(30)), nw=Math.min(W*0.68,280)|0, nx=(W-nw)/2|0;
+      ctx.fillStyle='rgba(255,255,255,0.05)';
+      ctx.fillRect(nx,y,nw,nh);
+      centered(`Player: ${playerName}`,y+(nh-tHint)/2|0,tHint,rgb('DIM'));
+      addZone(nx,y,nw,nh,()=>{nameEditing=true;nameBuf=playerName;focusNameInput();});
+      y+=nh+TS(10);
+    } else {
+      centered(`Player: ${playerName}  [N to rename]`,y,tHint,rgb('DIM')); y+=tHint+TS(18);
+    }
+  } else {
+    const cursor=(Math.floor(gTime*2)%2)?'_':' ';
+    const nh=Math.max(36,TS(30)), nw=Math.min(W*0.68,280)|0, nx=(W-nw)/2|0;
+    ctx.fillStyle='rgba(255,255,255,0.09)';
+    ctx.fillRect(nx,y,nw,nh);
+    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+    ctx.strokeRect(nx,y,nw,nh);
+    centered(`${nameBuf}${cursor}`,y+(nh-tSmall)/2|0,tSmall,'#fff');
+    addZone(nx,y,nw,nh,()=>focusNameInput());
+    y+=nh+TS(10);
+  }
+
+  if (hasTouch) {
+    const bh=Math.max(48,TS(42)), bw=Math.min(280,W*0.65)|0, bx=(W-bw)/2|0;
+    drawBtn('\u25ba  PLAY',bx,y,bw,bh,'rgba(55,150,55,0.9)','#fff',()=>{ensureAudio();reset();state=S.PLAY;startBgMusic();});
+    y+=bh+TS(8);
+    const sbh=Math.max(40,TS(34)), sbw=(W*0.43)|0, sgap=TS(6);
+    const sbx1=(W/2-sbw-sgap/2)|0, sbx2=(W/2+sgap/2)|0;
+    drawBtn('Rename',sbx1,y,sbw,sbh,'rgba(30,30,60,0.85)',rgb('DIM'),()=>{nameEditing=true;nameBuf=playerName;focusNameInput();});
+    drawBtn('Palette',sbx2,y,sbw,sbh,'rgba(30,30,60,0.85)',rgb('DIM'),()=>{state=S.PALETTE;});
+  } else {
+    centered('PRESS ENTER TO PLAY',y,tNorm,'#fff'); y+=tNorm+TS(10);
+    centered('P: palette editor',y,tHint,rgb('DIM'));
+  }
 
   // Particles in menu background
   drawFX();
@@ -1071,7 +1224,18 @@ function drawGame() {
     const s=`TUNNELING  ${phaseTicks}`;
     centered(s,barMid,tNorm,rgbA(C.PHASE_HEAD));
   } else if(tunnelCharges>0) {
-    centered('[SPACE] TUNNEL',barMid,tNorm,'rgba(160,220,255,0.78)');
+    const hint=hasTouch?'[ TUNNEL ]':'[SPACE] TUNNEL';
+    centered(hint,barMid,tNorm,'rgba(160,220,255,0.78)');
+    const hw=measured(hint,tNorm);
+    addZone((W-hw)/2-12,barY,hw+24,gUiH,()=>{
+      if(tunnelCharges>0&&phaseTicks===0){tunnelCharges--;phaseTicks=10;sndTunnelActivate();}
+    });
+  }
+
+  // Small menu button for touch (top-left corner)
+  if(hasTouch) {
+    const mbSz=Math.max(34,TS(30));
+    drawBtn('\u2630',4,4,mbSz,mbSz,'rgba(30,30,30,0.72)','rgba(200,200,200,0.85)',()=>{state=S.MENU;});
   }
 
   // Countdown
@@ -1118,14 +1282,40 @@ function drawDead() {
   }
 
   if(!nameEditing) {
-    centered(`Player: ${playerName}  [N to rename]`,y,tHint,rgb('DIM')); y+=tHint+TS(18);
+    if (hasTouch) {
+      const nh=Math.max(36,TS(28)), nw=Math.min(W*0.68,280)|0, nx=(W-nw)/2|0;
+      ctx.fillStyle='rgba(255,255,255,0.05)';
+      ctx.fillRect(nx,y,nw,nh);
+      centered(`Player: ${playerName}`,y+(nh-tHint)/2|0,tHint,rgb('DIM'));
+      addZone(nx,y,nw,nh,()=>{nameEditing=true;nameBuf=playerName;focusNameInput();});
+      y+=nh+TS(8);
+    } else {
+      centered(`Player: ${playerName}  [N to rename]`,y,tHint,rgb('DIM')); y+=tHint+TS(18);
+    }
   } else {
     const cur=(Math.floor(gTime*2)%2)?'_':' ';
-    centered(`Name: ${nameBuf}${cur}`,y,tSm,'#fff'); y+=tSm+TS(18);
+    const nh=Math.max(36,TS(30)), nw=Math.min(W*0.68,280)|0, nx=(W-nw)/2|0;
+    ctx.fillStyle='rgba(255,255,255,0.09)';
+    ctx.fillRect(nx,y,nw,nh);
+    ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
+    ctx.strokeRect(nx,y,nw,nh);
+    centered(`${nameBuf}${cur}`,y+(nh-tSm)/2|0,tSm,'#fff');
+    addZone(nx,y,nw,nh,()=>focusNameInput());
+    y+=nh+TS(8);
   }
 
-  centered('PRESS ENTER TO PLAY AGAIN',y,tNorm,'#fff'); y+=tNorm+TS(8);
-  centered('ESC: menu   P: palette',y,tHint,rgb('DIM'));
+  if (hasTouch) {
+    const bh=Math.max(48,TS(40)), bw=Math.min(260,W*0.62)|0, bx=(W-bw)/2|0;
+    drawBtn('\u25ba  PLAY AGAIN',bx,y,bw,bh,'rgba(55,150,55,0.9)','#fff',()=>{ensureAudio();reset();state=S.PLAY;startBgMusic();});
+    y+=bh+TS(8);
+    const sbh=Math.max(40,TS(34)), sbw=(W*0.43)|0, sgap=TS(6);
+    const sbx1=(W/2-sbw-sgap/2)|0, sbx2=(W/2+sgap/2)|0;
+    drawBtn('Menu',sbx1,y,sbw,sbh,'rgba(30,30,60,0.85)',rgb('DIM'),()=>{state=S.MENU;fetchLeaderboard();});
+    drawBtn('Palette',sbx2,y,sbw,sbh,'rgba(30,30,60,0.85)',rgb('DIM'),()=>{state=S.PALETTE;});
+  } else {
+    centered('PRESS ENTER TO PLAY AGAIN',y,tNorm,'#fff'); y+=tNorm+TS(8);
+    centered('ESC: menu   P: palette',y,tHint,rgb('DIM'));
+  }
 
   drawFX(gBoardX+shakeX|0, gBoardY+shakeY|0);
 }
@@ -1141,12 +1331,21 @@ function drawPalette() {
   ctx.strokeStyle='rgba(80,80,120,0.8)'; ctx.lineWidth=2;
   ctx.strokeRect(px,py,panelW,panelH);
 
-  drawText('PALETTE EDITOR',px+16,py+14,tNorm,'#aaa');
-  drawText('↑↓ select   ←→ adjust   Q/E channel   ESC back',px+16,py+14+tNorm+6,tHint,'rgba(120,120,160,0.8)');
-
-  const rowH=Math.max(24,(panelH-80)/C_KEYS.length)|0;
-  const chNames=['R','G','B'];
   const kidx=C_KEYS.indexOf(palEditKey);
+
+  // Reserve bottom strip height for touch controls
+  const ctrlH=hasTouch?Math.max(44,TS(40)):0;
+  const listH=panelH-80-ctrlH-8;
+  const rowH=Math.max(22,listH/C_KEYS.length)|0;
+
+  drawText('PALETTE EDITOR',px+16,py+14,tNorm,'#aaa');
+  if (hasTouch) {
+    drawText('Tap row \u2022 R/G/B channel \u2022 \u2212/+ value',px+16,py+14+tNorm+6,tHint,'rgba(120,120,160,0.8)');
+  } else {
+    drawText('\u2191\u2193 select   \u2190\u2192 adjust   Q/E channel   ESC back',px+16,py+14+tNorm+6,tHint,'rgba(120,120,160,0.8)');
+  }
+
+  const chNames=['R','G','B'];
 
   for(let i=0;i<C_KEYS.length;i++) {
     const k=C_KEYS[i];
@@ -1157,6 +1356,8 @@ function drawPalette() {
       ctx.fillStyle='rgba(60,60,100,0.5)';
       ctx.fillRect(px+4,ry,panelW-8,rowH);
     }
+    // Tap any row to select it
+    addZone(px+4,ry,panelW-8,rowH,()=>{palEditKey=k;});
 
     // Swatch
     ctx.fillStyle=rgb(k);
@@ -1185,6 +1386,33 @@ function drawPalette() {
         drawText(label,slotX+barW+6,chY,tHint,active?'#fff':'rgba(180,180,180,0.5)');
       }
     }
+  }
+
+  // Touch control strip at bottom of panel
+  if (hasTouch) {
+    const ctrlY=py+panelH-ctrlH-4;
+    const bkW=Math.max(52,TS(44));
+    // Back button
+    drawBtn('Back',px+panelW-8-bkW,ctrlY,bkW,ctrlH,'rgba(70,30,30,0.9)','rgba(220,180,180,0.9)',()=>{state=S.MENU;});
+    // +/- value buttons
+    const adjW=Math.max(44,TS(40)), adjGap=TS(4);
+    const adjX2=px+panelW-8-bkW-adjGap-adjW;
+    const adjX1=adjX2-adjGap-adjW;
+    drawBtn('+',adjX2,ctrlY,adjW,ctrlH,'rgba(30,65,30,0.9)','#8f8',()=>{C[palEditKey][palEditCh]=Math.min(255,C[palEditKey][palEditCh]+5);});
+    drawBtn('\u2212',adjX1,ctrlY,adjW,ctrlH,'rgba(65,30,30,0.9)','#f88',()=>{C[palEditKey][palEditCh]=Math.max(0,C[palEditKey][palEditCh]-5);});
+    // R/G/B channel selector
+    const chAreaW=adjX1-px-12;
+    const chW=(chAreaW/3-3)|0;
+    ['R','G','B'].forEach((ch,i)=>{
+      const tx=px+8+i*(chW+4);
+      const act=i===palEditCh;
+      const chFill=['rgba(80,20,20,0.9)','rgba(20,60,20,0.9)','rgba(20,20,80,0.9)'][i];
+      drawBtn(ch,tx,ctrlY,chW,ctrlH,act?chFill.replace('0.9','0.95')+'':'rgba(25,25,35,0.8)',act?'#fff':'rgba(150,150,180,0.6)',()=>{palEditCh=i;});
+    });
+    // ▲/▼ navigation beside title
+    const navSz=Math.max(32,TS(28));
+    drawBtn('\u25b2',px+panelW-navSz-6,py+10,navSz,navSz,'rgba(40,40,70,0.85)',rgb('DIM'),()=>{palEditKey=C_KEYS[(kidx-1+C_KEYS.length)%C_KEYS.length];});
+    drawBtn('\u25bc',px+panelW-navSz-6,py+10+navSz+4,navSz,navSz,'rgba(40,40,70,0.85)',rgb('DIM'),()=>{palEditKey=C_KEYS[(kidx+1)%C_KEYS.length];});
   }
 }
 
