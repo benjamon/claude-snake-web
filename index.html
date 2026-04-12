@@ -561,7 +561,7 @@ nameInput.setAttribute('autocomplete','off');
 nameInput.setAttribute('autocorrect','off');
 nameInput.setAttribute('autocapitalize','none');
 nameInput.setAttribute('spellcheck','false');
-nameInput.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:-100px;left:0;border:none;outline:none;';
+nameInput.style.cssText = 'position:fixed;opacity:0;pointer-events:none;width:1px;height:1px;top:50%;left:50%;border:none;outline:none;font-size:16px;';
 document.body.appendChild(nameInput);
 let nameInputActive = false;
 
@@ -588,8 +588,8 @@ function focusNameInput() {
   nameInputActive = true;
   nameInput.value = nameBuf;
   nameInput.style.pointerEvents = 'auto';
-  nameInput.focus();
-  nameInput.style.pointerEvents = 'none';
+  nameInput.focus({preventScroll: true});
+  setTimeout(() => { nameInput.style.pointerEvents = 'none'; }, 300);
 }
 
 // Swipe for movement, tap for zones
@@ -597,7 +597,8 @@ let swipeX0 = 0, swipeY0 = 0;
 const SWIPE_MIN = 30;
 
 canvas.addEventListener('touchstart', e => {
-  e.preventDefault(); ensureAudio();
+  if (state === S.PLAY) e.preventDefault();
+  ensureAudio();
   const t = e.touches[0]; swipeX0 = t.clientX; swipeY0 = t.clientY;
 }, {passive: false});
 
