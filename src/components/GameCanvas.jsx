@@ -15,6 +15,7 @@ export default function GameCanvas({ engine, renderer, playing, onSwipe, onLayou
   onLayoutRef.current = onLayout;
 
   const computeLayout = useCallback((w, h) => {
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
     const margin = Math.round(h * 0.03);
     const gCell = Math.min(
       Math.floor((w - 2 * margin) / COLS),
@@ -24,7 +25,7 @@ export default function GameCanvas({ engine, renderer, playing, onSwipe, onLayou
     const layout = {
       gCell,
       boardX: Math.round((w - boardW) / 2),
-      boardY: Math.round((h - boardH) / 2),
+      boardY: isTouch ? gCell : Math.round((h - boardH) / 2),
       canvasW: w,
       canvasH: h,
       boardW,

@@ -1,4 +1,4 @@
-export default function Leaderboard({ scores, ready, playerName, maxRows = 6 }) {
+export default function Leaderboard({ scores, ready, playerName, maxRows = 10 }) {
   if (!ready || !scores.length) return null;
   const show = scores.slice(0, maxRows);
   return (
@@ -7,7 +7,11 @@ export default function Leaderboard({ scores, ready, playerName, maxRows = 6 }) 
       {show.map((e, i) => (
         <div
           key={i}
-          className={`leaderboard__row${e.name === playerName ? ' leaderboard__row--me' : ''}`}
+          className={
+            'leaderboard__row'
+            + (e.name === playerName ? ' leaderboard__row--me' : '')
+            + (i === 0 ? ' leaderboard__row--first' : '')
+          }
         >
           <span>{i + 1}.</span>
           <span className="leaderboard__name">{e.name}</span>

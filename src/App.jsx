@@ -264,9 +264,7 @@ export default function App() {
           score={engine.score}
           stepCount={engine.stepCount}
           personalBest={personalBest}
-          tunnelCharges={engine.tunnelCharges}
           phaseTicks={engine.phaseTicks}
-          onTunnel={handleTunnel}
         />
       )}
     </div>

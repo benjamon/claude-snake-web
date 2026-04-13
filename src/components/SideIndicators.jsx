@@ -1,18 +1,16 @@
 export default function SideIndicators({ tunnelCharges, haloCharges, phaseTicks, layout }) {
   if (!layout) return null;
-  const { boardX, boardY, boardH } = layout;
+  const { boardX, boardY } = layout;
   const leftX = boardX - 4;
   const rightX = boardX + layout.boardW + 4;
-  const topY = boardY;
 
   return (
     <>
       {(tunnelCharges > 0 || phaseTicks > 0) && (
         <div
           className="side-indicators side-indicators--left"
-          style={{ right: `calc(100% - ${leftX}px)`, top: topY }}
+          style={{ right: `calc(100% - ${leftX}px)`, top: boardY }}
         >
-          <span className="indicator-label indicator-label--tunnel">TUNNEL</span>
           {Array.from({ length: Math.min(tunnelCharges, 10) }).map((_, i) => (
             <div key={i} className="charge-icon charge-icon--tunnel" />
           ))}
@@ -25,9 +23,8 @@ export default function SideIndicators({ tunnelCharges, haloCharges, phaseTicks,
       {haloCharges > 0 && (
         <div
           className="side-indicators side-indicators--right"
-          style={{ left: rightX, top: topY }}
+          style={{ left: rightX, top: boardY }}
         >
-          <span className="indicator-label indicator-label--halo">HALO</span>
           {Array.from({ length: Math.min(haloCharges, 10) }).map((_, i) => (
             <div key={i} className="charge-icon charge-icon--halo" />
           ))}

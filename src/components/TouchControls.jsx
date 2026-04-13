@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 const DIRS = {
   up:    { x: 0, y: -1 },
@@ -7,32 +7,29 @@ const DIRS = {
   right: { x: 1, y: 0 },
 };
 
-const ARROWS = { up: '\u25B2', down: '\u25BC', left: '\u25C0', right: '\u25B6' };
+export default function TouchControls({ onDirection, onTunnel, tunnelCharges }) {
+  const dpadRef = useRef(null);
 
-function DpadButton({ dir, onDir }) {
-  const handleStart = useCallback((e) => {
+  const handleDpadStart = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    onDir(DIRS[dir]);
-  }, [dir, onDir]);
+    const el = dpadRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    // Normalize to -1..1 from center
+    const nx = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = ((touch.clientY - rect.top) / rect.height) * 2 - 1;
+    // Dead zone: ignore if close to center (within 15% of half-size)
+    if (Math.abs(nx) < 0.10 && Math.abs(ny) < 0.10) return;
+    // Pick direction based on which axis is dominant
+    if (Math.abs(nx) > Math.abs(ny)) {
+      onDirection(nx > 0 ? DIRS.right : DIRS.left);
+    } else {
+      onDirection(ny > 0 ? DIRS.down : DIRS.up);
+    }
+  }, [onDirection]);
 
-  return (
-    <button
-      className={`touch-dpad__btn touch-dpad__btn--${dir}`}
-      onTouchStart={handleStart}
-      onPointerDown={(e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); }}
-    >
-      <svg viewBox="0 0 24 24" width="60%" height="60%">
-        {dir === 'up'    && <path d="M12 6 L4 18 L20 18 Z" fill="currentColor"/>}
-        {dir === 'down'  && <path d="M12 18 L4 6 L20 6 Z" fill="currentColor"/>}
-        {dir === 'left'  && <path d="M6 12 L18 4 L18 20 Z" fill="currentColor"/>}
-        {dir === 'right' && <path d="M18 12 L6 4 L6 20 Z" fill="currentColor"/>}
-      </svg>
-    </button>
-  );
-}
-
-export default function TouchControls({ onDirection, onTunnel, tunnelCharges }) {
   const handleTunnelStart = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -40,15 +37,31 @@ export default function TouchControls({ onDirection, onTunnel, tunnelCharges }) 
   }, [onTunnel]);
 
   const disabled = !tunnelCharges;
+  const iconSize = '28%';
 
   return (
     <div className="touch-controls">
-      <div className="touch-dpad">
-        <DpadButton dir="up" onDir={onDirection} />
-        <DpadButton dir="left" onDir={onDirection} />
-        <div className="touch-dpad__center" />
-        <DpadButton dir="right" onDir={onDirection} />
-        <DpadButton dir="down" onDir={onDirection} />
+      <div
+        ref={dpadRef}
+        className="touch-dpad"
+        onTouchStart={handleDpadStart}
+        onPointerDown={(e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); }}
+      >
+        {/* Arrow icons positioned in the four quadrants */}
+        <svg className="touch-dpad__icon touch-dpad__icon--up" viewBox="0 0 24 24" width={iconSize} height={iconSize}>
+          <path d="M12 4 L4 18 L20 18 Z" fill="currentColor"/>
+        </svg>
+        <svg className="touch-dpad__icon touch-dpad__icon--down" viewBox="0 0 24 24" width={iconSize} height={iconSize}>
+          <path d="M12 20 L4 6 L20 6 Z" fill="currentColor"/>
+        </svg>
+        <svg className="touch-dpad__icon touch-dpad__icon--left" viewBox="0 0 24 24" width={iconSize} height={iconSize}>
+          <path d="M4 12 L18 4 L18 20 Z" fill="currentColor"/>
+        </svg>
+        <svg className="touch-dpad__icon touch-dpad__icon--right" viewBox="0 0 24 24" width={iconSize} height={iconSize}>
+          <path d="M20 12 L6 4 L6 20 Z" fill="currentColor"/>
+        </svg>
+        {/* Subtle cross divider */}
+        <div className="touch-dpad__cross" />
       </div>
       <button
         className={`touch-tunnel-btn${disabled ? ' touch-tunnel-btn--disabled' : ''}`}
