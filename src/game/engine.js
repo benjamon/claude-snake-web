@@ -1,8 +1,9 @@
 import { COLS, ROWS, PORTAL_COLORS, C } from './constants.js';
 import {
   sndEat, sndDie, sndVictory, sndPortal,
-  sndTunnelPickup, sndTunnelActivate,
-  sndHaloPickup, sndHaloSave,
+  sndTunnelPickup, sndTunnelActivate, sndTunnelSpawn,
+  sndHaloPickup, sndHaloSave, sndHaloSpawn, sndPortalSpawn,
+  sndDeathBlockSpawn, sndWallWarning,
 } from './audio.js';
 
 function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
@@ -104,6 +105,7 @@ export function createEngine() {
           if (nearPortal) continue;
           this.deathBlocks.push(c); this.deathBlockFlash.push(1.0);
           this.shakeMag = Math.max(this.shakeMag, 2);
+          sndDeathBlockSpawn();
           return;
         }
       }
@@ -128,6 +130,7 @@ export function createEngine() {
     },
 
     spawnWall() {
+      sndWallWarning();
       const horizontal = Math.random() < 0.5;
       const lineIdx = rnd(0, (horizontal ? ROWS : COLS) - 1);
       this.wallEvents.push({ horizontal, lineIdx, warningSteps: 10, stepsRemaining: -1, cells: [] });
@@ -157,7 +160,7 @@ export function createEngine() {
       this.died = false; this.newBest = false;
       this.spawnPortalPair();
       this.food = this.trySpawnFood(); this.foodSpawnTime = this.gTime;
-      this.trySpawn(0, COLS - 1, c => this.tunnelPowerups.push(c));
+      this.trySpawn(0, COLS - 1, c => this.tunnelPowerups.push({ ...c, spawnTime: this.gTime }));
     },
 
     queueDirection(d) {
@@ -188,7 +191,7 @@ export function createEngine() {
 
     // Particle burst (cell-coordinate based for board-relative particles)
     burst(cellX, cellY, count, spMin, spMax, szMin, szMax, liMin, liMax, colors) {
-      const SP = 0.5, SZ = 2.0;
+      const SP = 0.25, SZ = 2.0;
       for (let i = 0; i < count; i++) {
         const ang = Math.random() * Math.PI * 2;
         const sp = (spMin + Math.random() * (spMax - spMin)) * SP;
@@ -197,13 +200,13 @@ export function createEngine() {
           x: cellX, y: cellY,
           vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
           sz: (szMin + Math.random() * (szMax - szMin)) * SZ,
-          li: 0.7, liMax: 0.7, col
+          li: 1.5, liMax: 1.5, col
         });
       }
     },
 
-    floatText(x, y, text, col) {
-      this.floatTexts.push({ x, y, text, col, li: 0.9, vy: -55 });
+    floatText(x, y, text, col, scale = 1, vy = -55) {
+      this.floatTexts.push({ x, y, text, col, li: 0.9, vy, scale });
     },
 
     updateFX(dt) {
@@ -211,7 +214,7 @@ export function createEngine() {
         const p = this.particles[i];
         p.x += p.vx * dt; p.y += p.vy * dt;
         // Exponential drag — particles coast to a stop
-        const drag = Math.pow(0.02, dt); // ~98% reduction per second
+        const drag = Math.pow(0.005, dt); // heavy drag — particles stop quickly
         p.vx *= drag; p.vy *= drag;
         p.li -= dt;
         if (p.li <= 0) this.particles.splice(i, 1);
@@ -264,7 +267,7 @@ export function createEngine() {
     update(dt) {
       this.gTime += dt;
       this.updateFX(dt);
-      this.shakeMag = Math.max(0, this.shakeMag - dt * 80);
+      this.shakeMag = Math.max(0, this.shakeMag - dt * 40);
       this.shakeX = (Math.random() * 2 - 1) * this.shakeMag;
       this.shakeY = (Math.random() * 2 - 1) * this.shakeMag;
 
@@ -316,7 +319,7 @@ export function createEngine() {
       let dead = false;
       if (!phasing) {
         dead = head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS;
-        if (!dead) for (let i = 0; i < this.snake.length; i++)
+        if (!dead) for (let i = 0; i < this.snake.length - 1; i++)
           if (!this.snakeGhost[i] && this.snake[i].x === head.x && this.snake[i].y === head.y) { dead = true; break; }
         if (!dead) for (const b of this.deathBlocks)
           if (b.x === head.x && b.y === head.y) { dead = true; break; }
@@ -330,13 +333,13 @@ export function createEngine() {
         this.haloCharges--; this.phaseTicks = 10; phasing = true;
         head.x = ((head.x % COLS) + COLS) % COLS;
         head.y = ((head.y % ROWS) + ROWS) % ROWS;
-        dead = false; sndHaloSave(); this.shakeMag = Math.max(this.shakeMag, 5);
+        dead = false; sndHaloSave(); this.shakeMag = Math.max(this.shakeMag, 15);
         this.burst(head.x, head.y, 18, 30, 120, 3, 7, 0.3, 0.7, [[255, 220, 80], [255, 255, 200]]);
       }
 
       if (dead) {
         this.deathExplosion();
-        this.shakeMag = 14; // big death shake
+        this.shakeMag = 20; // big death shake
         this.died = true;
         this.newBest = this.score > (parseInt(localStorage.getItem('sn_best') || '0'));
         // Record final frame
@@ -348,11 +351,17 @@ export function createEngine() {
       // Collect powerups
       for (let i = this.tunnelPowerups.length - 1; i >= 0; i--)
         if (this.tunnelPowerups[i].x === head.x && this.tunnelPowerups[i].y === head.y) {
-          this.tunnelCharges++; this.tunnelPowerups.splice(i, 1); sndTunnelPickup(); break;
+          this.tunnelCharges++;
+          this.burst(head.x, head.y, 12, 30, 120, 3, 7, 0.3, 0.6, [C.PHASE_HEAD, [200, 240, 255], [255, 255, 255]]);
+          this.shakeMag = Math.max(this.shakeMag, 5);
+          this.tunnelPowerups.splice(i, 1); sndTunnelPickup(); break;
         }
       for (let i = this.haloPowerups.length - 1; i >= 0; i--)
         if (this.haloPowerups[i].x === head.x && this.haloPowerups[i].y === head.y) {
-          this.haloCharges++; this.haloPowerups.splice(i, 1); sndHaloPickup(); break;
+          this.haloCharges++;
+          this.burst(head.x, head.y, 14, 30, 130, 3, 8, 0.3, 0.7, [[255, 220, 80], [255, 255, 200], [255, 240, 120]]);
+          this.shakeMag = Math.max(this.shakeMag, 5);
+          this.haloPowerups.splice(i, 1); sndHaloPickup(); break;
         }
 
       const ate = head.x === this.food.x && head.y === this.food.y;
@@ -361,11 +370,11 @@ export function createEngine() {
       if (ate) {
         this.foodExplosion(this.food.x, this.food.y);
         const pts = 1 + (this.stepCount / 100 | 0);
-        this.floatText(this.food.x, this.food.y, `+${pts}`, C.FOOD);
+        this.floatText(this.food.x, this.food.y, `+${pts}`, C.FOOD, 1.25, -8);
+        if (pts > 1) this.floatText(this.food.x, this.food.y - 0.8, `x${pts}`, [255, 220, 80], 1.25, -8);
         if (!phasing) sndEat();
         this.score += pts; this.food = this.trySpawnFood(); this.foodSpawnTime = this.gTime;
         this.tickRate = Math.max(0.066, this.tickRate - 0.0008);
-        this.shakeMag = Math.max(this.shakeMag, 3); // food collect shake
         this.tick = -this.tickRate * 0.5; // half-step pause after eating
         if (phasing) { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
       } else { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
@@ -377,9 +386,9 @@ export function createEngine() {
       this.replayFrames.push(snap(this));
 
       if (this.stepCount % 50 === 0) this.trySpawnDeathBlock();
-      if (this.stepCount % 100 === 0) this.trySpawn(0, COLS - 1, c => this.tunnelPowerups.push(c));
-      if (this.stepCount % 200 === 0) this.trySpawn(0, COLS - 1, c => this.haloPowerups.push(c));
-      if (this.stepCount > 0 && this.stepCount % 250 === 0) this.spawnPortalPair();
+      if (this.stepCount % 100 === 0) this.trySpawn(0, COLS - 1, c => { this.tunnelPowerups.push({ ...c, spawnTime: this.gTime }); sndTunnelSpawn(); });
+      if (this.stepCount % 200 === 0) this.trySpawn(0, COLS - 1, c => { this.haloPowerups.push(c); sndHaloSpawn(); });
+      if (this.stepCount > 0 && this.stepCount % 250 === 0) { this.spawnPortalPair(); sndPortalSpawn(); }
       if (this.stepCount > 0 && this.stepCount % 300 === 0) this.spawnWall();
 
       // Wall timers

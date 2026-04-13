@@ -12,7 +12,6 @@ import SetupScreen from './components/SetupScreen.jsx';
 import MenuScreen from './components/MenuScreen.jsx';
 import DeadScreen from './components/DeadScreen.jsx';
 import PaletteEditor from './components/PaletteEditor.jsx';
-import HUD from './components/HUD.jsx';
 import SideIndicators from './components/SideIndicators.jsx';
 import TouchControls from './components/TouchControls.jsx';
 
@@ -50,11 +49,21 @@ export default function App() {
   const [isNewBest, setIsNewBest] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState(false);
   const [boardLayout, setBoardLayout] = useState(null);
+  const [multShake, setMultShake] = useState(false);
+  const prevMultRef = useRef(1);
 
   // HUD polling — re-render periodically during play for score updates
   useEffect(() => {
     if (state !== S.PLAY) return;
-    const id = setInterval(() => tick(n => n + 1), 100);
+    const id = setInterval(() => {
+      tick(n => n + 1);
+      const m = 1 + (engineRef.current.stepCount / 100 | 0);
+      if (m > prevMultRef.current) {
+        prevMultRef.current = m;
+        setMultShake(true);
+        setTimeout(() => setMultShake(false), 400);
+      }
+    }, 100);
     return () => clearInterval(id);
   }, [state]);
 
@@ -205,16 +214,6 @@ export default function App() {
           />
         )}
 
-        {/* In-game menu button */}
-        {state === S.PLAY && (
-          <button
-            className="ingame-menu-btn"
-            onClick={() => setState(S.MENU)}
-          >
-            &#9776;
-          </button>
-        )}
-
         {/* Mobile touch controls */}
         {state === S.PLAY && (
           <TouchControls onDirection={handleSwipe} onTunnel={handleTunnel} tunnelCharges={engine.tunnelCharges} />
@@ -256,17 +255,27 @@ export default function App() {
         {showPalette && (
           <PaletteEditor onClose={() => setShowPalette(false)} />
         )}
+
+        {/* Score labels outside grid */}
+        {(state === S.PLAY || state === S.DEAD) && boardLayout && (
+          <>
+            <div
+              className="grid-score grid-score--left"
+              style={{ right: `calc(100% - ${boardLayout.boardX - 6}px)`, top: boardLayout.boardY }}
+            >
+              <div className={`grid-score__mult${multShake ? ' grid-score__mult--shake' : ''}`}>x{1 + (engine.stepCount / 100 | 0)}</div>
+              <div className="grid-score__val">{engine.score}</div>
+            </div>
+            <div
+              className="grid-score grid-score--right"
+              style={{ left: boardLayout.boardX + boardLayout.boardW + 6, top: boardLayout.boardY }}
+            >
+              <div className="grid-score__val">Best: {personalBest}</div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* HUD bar during play/dead */}
-      {(state === S.PLAY || state === S.DEAD) && (
-        <HUD
-          score={engine.score}
-          stepCount={engine.stepCount}
-          personalBest={personalBest}
-          phaseTicks={engine.phaseTicks}
-        />
-      )}
     </div>
   );
 }

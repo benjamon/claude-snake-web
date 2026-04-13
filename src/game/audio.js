@@ -119,6 +119,49 @@ export function sndHaloSave() {
   });
 }
 
+export function sndHaloSpawn() {
+  ensureAudio(); const t = audioCtx.currentTime;
+  // Sustained holy chorus: stacked fifths with slow swell
+  [[523.25, 0.14], [659.25, 0.10], [783.99, 0.08], [530, 0.12], [665, 0.08]].forEach(([f, a]) => {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.connect(g); g.connect(masterGain);
+    osc.frequency.value = f;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(a, t + 0.15);
+    g.gain.setValueAtTime(a, t + 0.5);
+    g.gain.linearRampToValueAtTime(0, t + 0.8);
+    osc.start(t); osc.stop(t + 0.8);
+  });
+}
+
+export function sndDeathBlockSpawn() {
+  ensureAudio(); const t = audioCtx.currentTime;
+  // Short ominous thud with low rumble
+  makeOsc('sawtooth', 65, t, t + 0.2, 0.2, 0.2, 0.001, 40);
+  makeOsc('sine', 90, t, t + 0.15, 0.15, 0.15, 0.001, 50);
+}
+
+export function sndWallWarning() {
+  ensureAudio(); const t = audioCtx.currentTime;
+  // Quick warning beep
+  makeOsc('square', 880, t, t + 0.06, 0.18, 0.18, 0.001);
+  makeOsc('square', 880, t + 0.1, t + 0.16, 0.18, 0.18, 0.001);
+}
+
+export function sndTunnelSpawn() {
+  ensureAudio(); const t = audioCtx.currentTime;
+  // Soft shimmer: two detuned sines sweeping up
+  makeOsc('sine', 400, t, t + 0.25, 0.18, 0.18, 0.001, 800);
+  makeOsc('sine', 410, t + 0.03, t + 0.28, 0.12, 0.12, 0.001, 820);
+}
+
+export function sndPortalSpawn() {
+  ensureAudio(); const t = audioCtx.currentTime;
+  // Deep warble rising into a chime
+  makeOsc('sine', 120, t, t + 0.3, 0.22, 0.22, 0.001, 400);
+  makeOsc('triangle', 600, t + 0.15, t + 0.45, 0.15, 0.15, 0.001, 1200);
+}
+
 // ---- Background music ----
 let bgAudio = null;
 let bgRunning = false, bgTimer = null;

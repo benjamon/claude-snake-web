@@ -65,8 +65,10 @@ function renderSnapshot(ctx, frame, layout, alpha) {
   // Food
   if (frame.food) {
     ctx.fillStyle = rgb('FOOD');
-    const pad = gCell * 0.14;
-    ctx.fillRect(frame.food.x * gCell + pad, frame.food.y * gCell + pad, gCell - 2 * pad, gCell - 2 * pad);
+    const r = gCell * 0.36;
+    ctx.beginPath();
+    ctx.arc(frame.food.x * gCell + gCell / 2, frame.food.y * gCell + gCell / 2, r, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // Snake body
@@ -139,8 +141,8 @@ export function renderGame(ctx, engine, layout) {
   }
 
   const boardW = gCell * COLS, boardH = gCell * ROWS;
-  const ox = boardX + (engine.shakeX * (gCell / 20)) | 0;
-  const oy = boardY + (engine.shakeY * (gCell / 20)) | 0;
+  const ox = boardX + (engine.shakeX * (gCell / 12)) | 0;
+  const oy = boardY + (engine.shakeY * (gCell / 12)) | 0;
 
   // If dead and replay is active, render replay as background behind the frozen game
   if (engine.died && engine.replayActive) {
@@ -248,24 +250,32 @@ export function renderGame(ctx, engine, layout) {
 
   // Tunnel powerups
   for (const tp of engine.tunnelPowerups) {
-    const tx = tp.x * gCell, ty = tp.y * gCell;
-    const pulse = (Math.sin(engine.gTime * 5 + tp.x * 0.7 + tp.y * 1.3) + 1) * 0.5;
-    const innerR = (gCell / 2 - 5) * (0.75 + pulse * 0.25);
-    ctx.fillStyle = rgb('TUNNEL_OUT');
-    ctx.fillRect(tx + 2, ty + 2, gCell - 4, gCell - 4);
-    ctx.fillStyle = rgbA(C.TUNNEL_OUT, 0.28 + pulse * 0.28);
-    ctx.beginPath(); ctx.arc(tx + gCell / 2, ty + gCell / 2, gCell / 2 - 2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = rgb('TUNNEL_IN');
-    ctx.beginPath(); ctx.arc(tx + gCell / 2, ty + gCell / 2, innerR, 0, Math.PI * 2); ctx.fill();
+    const tBob = Math.sin(engine.gTime * 2.8 + tp.x * 1.1 + tp.y * 0.7) * (gCell * 0.105);
+    const cx = tp.x * gCell + gCell / 2, cy = tp.y * gCell + gCell / 2 + tBob;
+    const age = engine.gTime - (tp.spawnTime || 0);
+    const spawnT = Math.min(age / 0.6, 1);
+    const spawnSc = 3 - 2 * spawnT;
+    const pulse = (Math.sin(engine.gTime * 3.5 + tp.x * 0.7 + tp.y * 1.3) + 1) * 0.5;
+    const baseR = (gCell / 2 - 2) * spawnSc;
+    const ringR = baseR * (0.9 + pulse * 0.1);
+    const lw = Math.max(2, gCell / 7);
+    // Dark fill matching phase color
+    ctx.fillStyle = rgbA(darken(C.PHASE_HEAD, 0.8), 0.9);
+    ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.fill();
+    // Bright ring
+    ctx.strokeStyle = rgbA(C.PHASE_HEAD, 0.8 + pulse * 0.2);
+    ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.stroke();
   }
 
   // Halo powerups
   for (const hp of engine.haloPowerups) {
-    const cx = hp.x * gCell + gCell / 2, cy = hp.y * gCell + gCell / 2;
+    const hBob = Math.sin(engine.gTime * 2.8 + hp.x * 0.9 + hp.y * 1.3) * (gCell * 0.105);
+    const cx = hp.x * gCell + gCell / 2, cy = hp.y * gCell + gCell / 2 + hBob;
     const pulse = (Math.sin(engine.gTime * 3.5 + hp.x * 1.1 + hp.y * 0.9) + 1) * 0.5;
     const spin = engine.gTime * 1.2;
     ctx.fillStyle = 'rgba(40,32,0,0.85)';
-    ctx.fillRect(hp.x * gCell + 2, hp.y * gCell + 2, gCell - 4, gCell - 4);
+    ctx.fillRect(hp.x * gCell + 2, hp.y * gCell + 2 + hBob, gCell - 4, gCell - 4);
     const r1 = (gCell / 2 - 2) * (0.95 + 0.05 * pulse);
     const lw = Math.max(1, gCell / 12);
     ctx.lineWidth = lw;
@@ -293,16 +303,16 @@ export function renderGame(ctx, engine, layout) {
     const age = engine.gTime - engine.foodSpawnTime;
     const t = Math.min(age / 0.6, 1);
     const sc = 3 - 2 * t;
-    const bob = Math.sin(engine.gTime * 2.8) * (gCell * 0.07) * t;
+    const bob = Math.sin(engine.gTime * 2.8) * (gCell * 0.105) * t;
     const pulse = Math.sin(engine.gTime * 4.2) * 0.10 * t;
-    const pad = gCell * 0.14 - gCell * 0.10 * pulse;
-    const fsz = Math.max(2, gCell * sc - 2 * pad);
-    const off = (gCell - gCell * sc) * 0.5;
+    const r = Math.max(1, (gCell * sc * 0.5 - gCell * 0.04) * (1 + pulse * 0.3));
+    const cx = engine.food.x * gCell + gCell / 2;
+    const cy = engine.food.y * gCell + gCell / 2 + bob;
     ctx.fillStyle = rgb('FOOD');
-    ctx.fillRect(engine.food.x * gCell + off + pad, engine.food.y * gCell + off + pad + bob, fsz, fsz);
-    const shine = Math.max(2, fsz / 5);
-    ctx.fillStyle = 'rgba(255,160,160,0.7)';
-    ctx.fillRect(engine.food.x * gCell + off + pad + 2, engine.food.y * gCell + off + pad + 2 + bob, shine, shine);
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    const shineR = Math.max(1, r * 0.3);
+    ctx.fillStyle = 'rgba(255,200,200,0.6)';
+    ctx.beginPath(); ctx.arc(cx - r * 0.25, cy - r * 0.25, shineR, 0, Math.PI * 2); ctx.fill();
   }
 
   // Ghost trail
@@ -399,10 +409,11 @@ export function renderFX(ctx, engine, boardOx, boardOy, gCell) {
     const s = p.sz * t;
     ctx.fillRect(boardOx + p.x * gCell + gCell / 2 - s / 2, boardOy + p.y * gCell + gCell / 2 - s / 2, s, s);
   }
-  const fSz = Math.max(10, gCell * 0.8) | 0;
+  const fSzBase = Math.max(10, gCell * 0.8) | 0;
   for (const f of engine.floatTexts) {
     const a = Math.min(1, f.li * 2);
-    ctx.font = `bold ${fSz}px monospace`;
+    const sc = f.scale || 1;
+    ctx.font = `bold ${(fSzBase * sc) | 0}px monospace`;
     ctx.fillStyle = rgbA(f.col, a);
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(f.text, boardOx + f.x * gCell + gCell / 2, boardOy + f.y * gCell + f.vy * (0.9 - f.li));
