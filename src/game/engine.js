@@ -119,7 +119,7 @@ export function createEngine() {
 
     // Particle burst (cell-coordinate based for board-relative particles)
     burst(cellX, cellY, count, spMin, spMax, szMin, szMax, liMin, liMax, colors) {
-      const SP = 2.0 * 0.2, SZ = 2.0; // 80% speed reduction
+      const SP = 0.5, SZ = 2.0;
       for (let i = 0; i < count; i++) {
         const ang = Math.random() * Math.PI * 2;
         const sp = (spMin + Math.random() * (spMax - spMin)) * SP;
@@ -128,7 +128,7 @@ export function createEngine() {
           x: cellX, y: cellY,
           vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
           sz: (szMin + Math.random() * (szMax - szMin)) * SZ,
-          li: 1.2, liMax: 1.2, col
+          li: 0.7, liMax: 0.7, col
         });
       }
     },
