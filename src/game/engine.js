@@ -7,6 +7,35 @@ import {
 
 function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
 
+// Deep-copy a snapshot of visual state for replay
+function snap(engine) {
+  return {
+    snake: engine.snake.map(s => ({ ...s })),
+    snakeGhost: [...engine.snakeGhost],
+    dir: { ...engine.dir },
+    food: engine.food ? { ...engine.food } : null,
+    foodSpawnTime: engine.foodSpawnTime,
+    deathBlocks: engine.deathBlocks.map(b => ({ ...b })),
+    deathBlockFlash: [...engine.deathBlockFlash],
+    tunnelPowerups: engine.tunnelPowerups.map(t => ({ ...t })),
+    haloPowerups: engine.haloPowerups.map(h => ({ ...h })),
+    wallEvents: engine.wallEvents.map(w => ({
+      ...w,
+      cells: w.cells.map(c => ({ ...c })),
+    })),
+    portalPairs: engine.portalPairs.map(pp => ({
+      a: { ...pp.a }, b: { ...pp.b },
+      color: pp.color, spawnTime: pp.spawnTime,
+    })),
+    phaseTicks: engine.phaseTicks,
+    score: engine.score,
+    stepCount: engine.stepCount,
+    tunnelCharges: engine.tunnelCharges,
+    haloCharges: engine.haloCharges,
+    gTime: engine.gTime,
+  };
+}
+
 export function createEngine() {
   const engine = {
     // State
@@ -22,6 +51,13 @@ export function createEngine() {
     gTime: 0, shakeX: 0, shakeY: 0, shakeMag: 0,
     // Events (set per frame, read by React)
     died: false, newBest: false,
+    // Replay recording
+    replayFrames: [],
+    replayIndex: 0,
+    replayTimer: 0,
+    replayActive: false,
+    replaySpeed: 1,
+    lastReplay: null, // the finished replay for playback
 
     cellOccupied(c, skipFood = false) {
       for (const s of this.snake) if (s.x === c.x && s.y === c.y) return true;
@@ -53,7 +89,11 @@ export function createEngine() {
       for (let i = 0; i < 300; i++) {
         const c = { x: rnd(0, COLS - 1), y: rnd(0, ROWS - 1) };
         if (Math.abs(c.x - head.x) + Math.abs(c.y - head.y) < 6) continue;
-        if (!this.cellOccupied(c)) { this.deathBlocks.push(c); this.deathBlockFlash.push(1.0); return; }
+        if (!this.cellOccupied(c)) {
+          this.deathBlocks.push(c); this.deathBlockFlash.push(1.0);
+          this.shakeMag = Math.max(this.shakeMag, 2);
+          return;
+        }
       }
     },
 
@@ -82,6 +122,15 @@ export function createEngine() {
     },
 
     reset() {
+      // Save previous game's replay for death-screen playback
+      if (this.replayFrames.length > 0) {
+        this.lastReplay = this.replayFrames;
+      }
+      this.replayFrames = [];
+      this.replayIndex = 0;
+      this.replayTimer = 0;
+      this.replayActive = false;
+
       const mx = COLS / 2 | 0, my = ROWS / 2 | 0;
       this.snake = [{ x: mx + 1, y: my }, { x: mx, y: my }, { x: mx - 1, y: my }];
       this.snakeGhost = [false, false, false];
@@ -164,6 +213,34 @@ export function createEngine() {
       this.burst(cellX, cellY, 14, 40, 150, 3, 7, 0.25, 0.55, [C.FOOD, [255, 160, 120], [255, 220, 80]]);
     },
 
+    // Start replay playback of the last recorded game
+    startReplay() {
+      if (!this.lastReplay || this.lastReplay.length === 0) return;
+      this.replayActive = true;
+      this.replayIndex = 0;
+      this.replayTimer = 0;
+      // Play back 4x faster than real-time
+      this.replaySpeed = 4;
+    },
+
+    // Advance replay and return current frame (or null if not replaying)
+    updateReplay(dt) {
+      if (!this.replayActive || !this.lastReplay) return null;
+      this.replayTimer += dt * this.replaySpeed;
+      // Each original tick was ~tickRate seconds apart; we stored one frame per tick.
+      // Advance at a steady rate regardless of original tick rate.
+      const framesPerSec = 20 * this.replaySpeed; // ~20 ticks/sec base
+      const targetIdx = Math.floor(this.replayTimer * 20);
+      if (targetIdx >= this.lastReplay.length) {
+        // Loop
+        this.replayTimer = 0;
+        this.replayIndex = 0;
+        return this.lastReplay[0];
+      }
+      this.replayIndex = Math.min(targetIdx, this.lastReplay.length - 1);
+      return this.lastReplay[this.replayIndex];
+    },
+
     update(dt) {
       this.gTime += dt;
       this.updateFX(dt);
@@ -202,6 +279,7 @@ export function createEngine() {
         if (hitA || hitB) {
           const from = hitA ? pp.a : pp.b, to = hitA ? pp.b : pp.a;
           head = { ...to }; this.portalCooldown = 1; sndPortal();
+          this.shakeMag = Math.max(this.shakeMag, 4); // portal shake
           for (let s = 0; s <= 12; s++) {
             const t = s / 12;
             this.burst(
@@ -232,14 +310,17 @@ export function createEngine() {
         this.haloCharges--; this.phaseTicks = 10; phasing = true;
         head.x = ((head.x % COLS) + COLS) % COLS;
         head.y = ((head.y % ROWS) + ROWS) % ROWS;
-        dead = false; sndHaloSave(); this.shakeMag = 3;
+        dead = false; sndHaloSave(); this.shakeMag = Math.max(this.shakeMag, 5);
         this.burst(head.x, head.y, 18, 30, 120, 3, 7, 0.3, 0.7, [[255, 220, 80], [255, 255, 200]]);
       }
 
       if (dead) {
-        this.deathExplosion(); this.shakeMag = 6;
+        this.deathExplosion();
+        this.shakeMag = 14; // big death shake
         this.died = true;
         this.newBest = this.score > (parseInt(localStorage.getItem('sn_best') || '0'));
+        // Record final frame
+        this.replayFrames.push(snap(this));
         if (this.newBest) sndVictory(); else sndDie();
         return;
       }
@@ -264,11 +345,15 @@ export function createEngine() {
         if (!phasing) sndEat();
         this.score += pts; this.food = this.trySpawnFood(); this.foodSpawnTime = this.gTime;
         this.tickRate = Math.max(0.055, this.tickRate - 0.0008);
+        this.shakeMag = Math.max(this.shakeMag, 3); // food collect shake
         if (phasing) { this.snake.pop(); this.snakeGhost.pop(); }
       } else { this.snake.pop(); this.snakeGhost.pop(); }
 
       if (this.phaseTicks > 0) this.phaseTicks--;
       this.stepCount++;
+
+      // Record replay frame each tick
+      this.replayFrames.push(snap(this));
 
       if (this.stepCount % 50 === 0) this.trySpawnDeathBlock();
       if (this.stepCount % 100 === 0) this.trySpawn(0, COLS - 1, c => this.tunnelPowerups.push(c));

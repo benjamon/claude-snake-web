@@ -73,6 +73,7 @@ export default function App() {
           setSubmitFeedback(true);
           setTimeout(() => setSubmitFeedback(false), 2500);
         }
+        e.startReplay();
         setState(S.DEAD);
       }
     }, 50);

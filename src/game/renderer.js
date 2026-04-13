@@ -1,5 +1,91 @@
 import { COLS, ROWS, C, rgb, rgbA, brighten } from './constants.js';
 
+// Render a snapshot frame (used for replay playback)
+// Draws the board with all game objects but no FX/countdown — just the static state
+function renderSnapshot(ctx, frame, layout, alpha) {
+  const { gCell, boardX, boardY } = layout;
+  const boardW = gCell * COLS, boardH = gCell * ROWS;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(boardX, boardY);
+
+  // Board BG
+  ctx.fillStyle = rgb('BOARD_BG');
+  ctx.fillRect(0, 0, boardW, boardH);
+
+  // Grid
+  ctx.strokeStyle = rgb('GRID'); ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= COLS; x++) { ctx.moveTo(x * gCell, 0); ctx.lineTo(x * gCell, boardH); }
+  for (let y = 0; y <= ROWS; y++) { ctx.moveTo(0, y * gCell); ctx.lineTo(boardW, y * gCell); }
+  ctx.stroke();
+
+  // Wall events
+  for (const w of frame.wallEvents) {
+    if (w.warningSteps > 0) {
+      ctx.fillStyle = rgbA(C.WALL, 0.2);
+      if (w.horizontal) ctx.fillRect(0, w.lineIdx * gCell, boardW, gCell);
+      else ctx.fillRect(w.lineIdx * gCell, 0, gCell, boardH);
+    } else if (w.stepsRemaining > 0) {
+      ctx.fillStyle = rgbA(C.WALL, 0.4);
+      if (w.horizontal) ctx.fillRect(0, w.lineIdx * gCell, boardW, gCell);
+      else ctx.fillRect(w.lineIdx * gCell, 0, gCell, boardH);
+    }
+  }
+
+  // Death blocks
+  for (const b of frame.deathBlocks) {
+    ctx.fillStyle = rgb('BLOCK');
+    ctx.fillRect(b.x * gCell + 1, b.y * gCell + 1, gCell - 2, gCell - 2);
+    ctx.strokeStyle = rgbA(C.BLOCK_MARK, 0.8);
+    ctx.lineWidth = Math.max(1, gCell / 8);
+    const m = gCell * 0.25;
+    ctx.beginPath();
+    ctx.moveTo(b.x * gCell + m, b.y * gCell + m); ctx.lineTo(b.x * gCell + gCell - m, b.y * gCell + gCell - m);
+    ctx.moveTo(b.x * gCell + gCell - m, b.y * gCell + m); ctx.lineTo(b.x * gCell + m, b.y * gCell + gCell - m);
+    ctx.stroke();
+  }
+
+  // Portal lines + rings (simplified)
+  for (const pp of frame.portalPairs) {
+    const ax = pp.a.x * gCell + gCell / 2, ay = pp.a.y * gCell + gCell / 2;
+    const bx = pp.b.x * gCell + gCell / 2, by = pp.b.y * gCell + gCell / 2;
+    ctx.strokeStyle = rgbA(pp.color, 0.4);
+    ctx.lineWidth = Math.max(2, gCell / 8);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    [pp.a, pp.b].forEach(cell => {
+      const cx = cell.x * gCell + gCell / 2, cy = cell.y * gCell + gCell / 2;
+      ctx.strokeStyle = rgbA(pp.color, 0.6);
+      ctx.lineWidth = Math.max(2, gCell / 7);
+      ctx.beginPath(); ctx.arc(cx, cy, gCell * 0.4, 0, Math.PI * 2); ctx.stroke();
+    });
+  }
+
+  // Food
+  if (frame.food) {
+    ctx.fillStyle = rgb('FOOD');
+    const pad = gCell * 0.14;
+    ctx.fillRect(frame.food.x * gCell + pad, frame.food.y * gCell + pad, gCell - 2 * pad, gCell - 2 * pad);
+  }
+
+  // Snake body
+  const bCol = frame.phaseTicks > 0 ? C.PHASE_BODY : C.BODY;
+  for (let i = frame.snake.length - 1; i >= 1; i--) {
+    if (!frame.snakeGhost[i]) {
+      ctx.fillStyle = rgbA(bCol, 0.9);
+      ctx.fillRect(frame.snake[i].x * gCell + 2, frame.snake[i].y * gCell + 2, gCell - 4, gCell - 4);
+    }
+  }
+
+  // Head
+  const hCol = frame.phaseTicks > 0 ? C.PHASE_HEAD : C.HEAD;
+  ctx.fillStyle = rgbA(hCol);
+  ctx.fillRect(frame.snake[0].x * gCell + 1, frame.snake[0].y * gCell + 1, gCell - 2, gCell - 2);
+
+  ctx.restore();
+}
+
 export function renderGame(ctx, engine, layout) {
   const { gCell, boardX, boardY, canvasW, canvasH } = layout;
   if (!gCell) return; // layout not ready
@@ -10,6 +96,13 @@ export function renderGame(ctx, engine, layout) {
 
   // If game hasn't been initialized yet, just show background + FX
   if (!engine.food) {
+    // If there's a replay, render it as background
+    if (engine.replayActive) {
+      const frame = engine.updateReplay(1 / 60);
+      if (frame) {
+        renderSnapshot(ctx, frame, layout, 0.35);
+      }
+    }
     renderFX(ctx, engine, 0, 0, gCell);
     return;
   }
@@ -17,6 +110,17 @@ export function renderGame(ctx, engine, layout) {
   const boardW = gCell * COLS, boardH = gCell * ROWS;
   const ox = boardX + (engine.shakeX * (gCell / 20)) | 0;
   const oy = boardY + (engine.shakeY * (gCell / 20)) | 0;
+
+  // If dead and replay is active, render replay as background behind the frozen game
+  if (engine.died && engine.replayActive) {
+    const frame = engine.updateReplay(1 / 60);
+    if (frame) {
+      renderSnapshot(ctx, frame, layout, 0.35);
+      // Dim overlay between replay and the frozen death state
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, canvasW, canvasH);
+    }
+  }
 
   ctx.save();
   ctx.translate(ox, oy);
