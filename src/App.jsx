@@ -14,6 +14,7 @@ import DeadScreen from './components/DeadScreen.jsx';
 import PaletteEditor from './components/PaletteEditor.jsx';
 import HUD from './components/HUD.jsx';
 import SideIndicators from './components/SideIndicators.jsx';
+import TouchControls from './components/TouchControls.jsx';
 
 const S = { SETUP: 0, MENU: 1, PLAY: 2, DEAD: 3 };
 
@@ -209,6 +210,11 @@ export default function App() {
           >
             &#9776;
           </button>
+        )}
+
+        {/* Mobile touch controls */}
+        {state === S.PLAY && (
+          <TouchControls onDirection={handleSwipe} onTunnel={handleTunnel} />
         )}
 
         {/* Screen overlays */}

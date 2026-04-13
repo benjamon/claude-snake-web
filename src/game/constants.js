@@ -65,3 +65,6 @@ export function rgbA(arr, a = 1) {
 export function brighten(arr, t) {
   return arr.map(v => Math.min(255, Math.round(v + (255 - v) * t)));
 }
+export function darken(arr, t) {
+  return arr.map(v => Math.max(0, Math.round(v * (1 - t))));
+}

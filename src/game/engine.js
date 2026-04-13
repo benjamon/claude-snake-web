@@ -12,6 +12,7 @@ function snap(engine) {
   return {
     snake: engine.snake.map(s => ({ ...s })),
     snakeGhost: [...engine.snakeGhost],
+    snakeDir: engine.snakeDir.map(d => ({ ...d })),
     dir: { ...engine.dir },
     food: engine.food ? { ...engine.food } : null,
     foodSpawnTime: engine.foodSpawnTime,
@@ -39,7 +40,7 @@ function snap(engine) {
 export function createEngine() {
   const engine = {
     // State
-    snake: [], snakeGhost: [], dir: { x: 1, y: 0 }, inputQ: [],
+    snake: [], snakeGhost: [], snakeDir: [], dir: { x: 1, y: 0 }, inputQ: [],
     food: null, foodSpawnTime: 0,
     score: 0, tickRate: 0.156, tick: 0, startDelay: 3.0,
     deathBlocks: [], deathBlockFlash: [], tunnelPowerups: [], haloPowerups: [],
@@ -90,6 +91,17 @@ export function createEngine() {
         const c = { x: rnd(0, COLS - 1), y: rnd(0, ROWS - 1) };
         if (Math.abs(c.x - head.x) + Math.abs(c.y - head.y) < 6) continue;
         if (!this.cellOccupied(c)) {
+          // Don't spawn adjacent to any portal
+          let nearPortal = false;
+          for (const pp of this.portalPairs) {
+            for (const p of [pp.a, pp.b]) {
+              if (Math.abs(c.x - p.x) <= 1 && Math.abs(c.y - p.y) <= 1) {
+                nearPortal = true; break;
+              }
+            }
+            if (nearPortal) break;
+          }
+          if (nearPortal) continue;
           this.deathBlocks.push(c); this.deathBlockFlash.push(1.0);
           this.shakeMag = Math.max(this.shakeMag, 2);
           return;
@@ -134,6 +146,7 @@ export function createEngine() {
       const mx = COLS / 2 | 0, my = ROWS / 2 | 0;
       this.snake = [{ x: mx + 1, y: my }, { x: mx, y: my }, { x: mx - 1, y: my }];
       this.snakeGhost = [false, false, false];
+      this.snakeDir = [{ x: 1, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0 }];
       this.dir = { x: 1, y: 0 }; this.inputQ = [];
       this.score = 0; this.tick = 0; this.tickRate = 0.156; this.startDelay = 3.0;
       this.deathBlocks = []; this.deathBlockFlash = []; this.tunnelPowerups = []; this.haloPowerups = [];
@@ -336,7 +349,7 @@ export function createEngine() {
         }
 
       const ate = head.x === this.food.x && head.y === this.food.y;
-      this.snake.unshift(head); this.snakeGhost.unshift(phasing);
+      this.snake.unshift(head); this.snakeGhost.unshift(phasing); this.snakeDir.unshift({ ...this.dir });
 
       if (ate) {
         this.foodExplosion(this.food.x, this.food.y);
@@ -346,8 +359,9 @@ export function createEngine() {
         this.score += pts; this.food = this.trySpawnFood(); this.foodSpawnTime = this.gTime;
         this.tickRate = Math.max(0.055, this.tickRate - 0.0008);
         this.shakeMag = Math.max(this.shakeMag, 3); // food collect shake
-        if (phasing) { this.snake.pop(); this.snakeGhost.pop(); }
-      } else { this.snake.pop(); this.snakeGhost.pop(); }
+        this.tick = -this.tickRate * 0.5; // half-step pause after eating
+        if (phasing) { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
+      } else { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
 
       if (this.phaseTicks > 0) this.phaseTicks--;
       this.stepCount++;

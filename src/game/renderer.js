@@ -1,4 +1,4 @@
-import { COLS, ROWS, C, rgb, rgbA, brighten } from './constants.js';
+import { COLS, ROWS, C, rgb, rgbA, brighten, darken } from './constants.js';
 
 // Render a snapshot frame (used for replay playback)
 // Draws the board with all game objects but no FX/countdown — just the static state
@@ -71,10 +71,41 @@ function renderSnapshot(ctx, frame, layout, alpha) {
 
   // Snake body
   const bCol = frame.phaseTicks > 0 ? C.PHASE_BODY : C.BODY;
+  const eW = Math.max(1, Math.round(gCell * 0.12));
   for (let i = frame.snake.length - 1; i >= 1; i--) {
     if (!frame.snakeGhost[i]) {
+      const sx = frame.snake[i].x * gCell + 2, sy = frame.snake[i].y * gCell + 2;
+      const sw = gCell - 4, sh = gCell - 4;
       ctx.fillStyle = rgbA(bCol, 0.9);
-      ctx.fillRect(frame.snake[i].x * gCell + 2, frame.snake[i].y * gCell + 2, gCell - 4, gCell - 4);
+      ctx.fillRect(sx, sy, sw, sh);
+      if (frame.snakeDir && frame.snakeDir[i]) {
+        const d = frame.snakeDir[i];
+        const da = frame.snakeDir[i - 1] || d;
+        const isTail = (i === frame.snake.length - 1);
+        const isCorner = (d.x !== da.x || d.y !== da.y);
+        let top = false, bot = false, lft = false, rgt = false;
+        if (!isCorner) {
+          if (d.x !== 0) { top = true; bot = true; }
+          else            { lft = true; rgt = true; }
+          if (isTail) {
+            if (d.x === 1)  lft = true;
+            if (d.x === -1) rgt = true;
+            if (d.y === 1)  top = true;
+            if (d.y === -1) bot = true;
+          }
+        } else {
+          const eX = -d.x, eY = -d.y;
+          top = (eY !== -1 && da.y !== -1);
+          bot = (eY !== 1  && da.y !== 1);
+          lft = (eX !== -1 && da.x !== -1);
+          rgt = (eX !== 1  && da.x !== 1);
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        if (top) ctx.fillRect(sx, sy, sw, eW);
+        if (bot) ctx.fillRect(sx, sy + sh - eW, sw, eW);
+        if (lft) ctx.fillRect(sx, sy, eW, sh);
+        if (rgt) ctx.fillRect(sx + sw - eW, sy, eW, sh);
+      }
     }
   }
 
@@ -284,13 +315,49 @@ export function renderGame(ctx, engine, layout) {
 
   // Snake body
   const bCol = engine.phaseTicks > 0 ? C.PHASE_BODY : C.BODY;
+  const edgeW = Math.max(1, Math.round(gCell * 0.12));
   const fadeStart = engine.snake.length - Math.max(1, (engine.snake.length * 0.3) | 0);
   for (let i = engine.snake.length - 1; i >= 1; i--) {
     if (!engine.snakeGhost[i]) {
       let a = i >= fadeStart ? 0.55 + (1 - 0.55) * (1 - (i - fadeStart) / (engine.snake.length - fadeStart)) : 1.0;
       if (engine.phaseTicks > 0) a = Math.min(a, 0.78);
+      const sx = engine.snake[i].x * gCell + 2, sy = engine.snake[i].y * gCell + 2;
+      const sw = gCell - 4, sh = gCell - 4;
       ctx.fillStyle = rgbA(bCol, a);
-      ctx.fillRect(engine.snake[i].x * gCell + 2, engine.snake[i].y * gCell + 2, gCell - 4, gCell - 4);
+      ctx.fillRect(sx, sy, sw, sh);
+      // Directional edges
+      if (engine.snakeDir[i]) {
+        const d = engine.snakeDir[i];           // entry: direction used to reach this cell
+        const da = engine.snakeDir[i - 1] || d; // exit: direction of segment toward head
+        const isTail = (i === engine.snake.length - 1);
+        const isCorner = (d.x !== da.x || d.y !== da.y);
+        let top = false, bot = false, lft = false, rgt = false;
+        if (!isCorner) {
+          // Straight: parallel lines along direction of travel
+          if (d.x !== 0) { top = true; bot = true; }
+          else            { lft = true; rgt = true; }
+          // Tail endcap: extra line opposite direction of travel
+          if (isTail) {
+            if (d.x === 1)  lft = true;
+            if (d.x === -1) rgt = true;
+            if (d.y === 1)  top = true;
+            if (d.y === -1) bot = true;
+          }
+        } else {
+          // Corner: edges on the outside of the turn
+          // Entry from opposite of d, exit toward da
+          const eX = -d.x, eY = -d.y; // entry side
+          top = (eY !== -1 && da.y !== -1);
+          bot = (eY !== 1  && da.y !== 1);
+          lft = (eX !== -1 && da.x !== -1);
+          rgt = (eX !== 1  && da.x !== 1);
+        }
+        ctx.fillStyle = `rgba(0,0,0,${0.25 * a})`;
+        if (top) ctx.fillRect(sx, sy, sw, edgeW);
+        if (bot) ctx.fillRect(sx, sy + sh - edgeW, sw, edgeW);
+        if (lft) ctx.fillRect(sx, sy, edgeW, sh);
+        if (rgt) ctx.fillRect(sx + sw - edgeW, sy, edgeW, sh);
+      }
     }
   }
 
