@@ -42,7 +42,7 @@ export function createEngine() {
     // State
     snake: [], snakeGhost: [], snakeDir: [], dir: { x: 1, y: 0 }, inputQ: [],
     food: null, foodSpawnTime: 0,
-    score: 0, tickRate: 0.156, tick: 0, startDelay: 3.0,
+    score: 0, tickRate: 0.187, tick: 0, startDelay: 3.0,
     deathBlocks: [], deathBlockFlash: [], tunnelPowerups: [], haloPowerups: [],
     wallEvents: [], portalPairs: [],
     phaseTicks: 0, stepCount: 0, portalCooldown: 0,
@@ -148,7 +148,7 @@ export function createEngine() {
       this.snakeGhost = [false, false, false];
       this.snakeDir = [{ x: 1, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0 }];
       this.dir = { x: 1, y: 0 }; this.inputQ = [];
-      this.score = 0; this.tick = 0; this.tickRate = 0.156; this.startDelay = 3.0;
+      this.score = 0; this.tick = 0; this.tickRate = 0.187; this.startDelay = 3.0;
       this.deathBlocks = []; this.deathBlockFlash = []; this.tunnelPowerups = []; this.haloPowerups = [];
       this.wallEvents = []; this.portalPairs = [];
       this.phaseTicks = 0; this.stepCount = 0; this.portalCooldown = 0;
@@ -162,9 +162,16 @@ export function createEngine() {
 
     queueDirection(d) {
       const last = this.inputQ.length ? this.inputQ[this.inputQ.length - 1] : this.dir;
-      if (d.x !== -last.x || d.y !== -last.y) {
+      if (this.portalCooldown > 0) {
+        // After portal: allow any direction including reversal
         if (d.x !== last.x || d.y !== last.y) {
           if (this.inputQ.length < 3) this.inputQ.push(d);
+        }
+      } else {
+        if (d.x !== -last.x || d.y !== -last.y) {
+          if (d.x !== last.x || d.y !== last.y) {
+            if (this.inputQ.length < 3) this.inputQ.push(d);
+          }
         }
       }
     },
@@ -357,7 +364,7 @@ export function createEngine() {
         this.floatText(this.food.x, this.food.y, `+${pts}`, C.FOOD);
         if (!phasing) sndEat();
         this.score += pts; this.food = this.trySpawnFood(); this.foodSpawnTime = this.gTime;
-        this.tickRate = Math.max(0.055, this.tickRate - 0.0008);
+        this.tickRate = Math.max(0.066, this.tickRate - 0.0008);
         this.shakeMag = Math.max(this.shakeMag, 3); // food collect shake
         this.tick = -this.tickRate * 0.5; // half-step pause after eating
         if (phasing) { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }

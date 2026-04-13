@@ -49,6 +49,7 @@ export default function App() {
   const [deathScore, setDeathScore] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState(false);
+  const [boardLayout, setBoardLayout] = useState(null);
 
   // HUD polling — re-render periodically during play for score updates
   useEffect(() => {
@@ -191,6 +192,7 @@ export default function App() {
           renderer={renderGame}
           playing={state === S.PLAY || state === S.DEAD}
           onSwipe={handleSwipe}
+          onLayout={setBoardLayout}
         />
 
         {/* Side indicators during play */}
@@ -199,6 +201,7 @@ export default function App() {
             tunnelCharges={engine.tunnelCharges}
             haloCharges={engine.haloCharges}
             phaseTicks={engine.phaseTicks}
+            layout={boardLayout}
           />
         )}
 
@@ -214,7 +217,7 @@ export default function App() {
 
         {/* Mobile touch controls */}
         {state === S.PLAY && (
-          <TouchControls onDirection={handleSwipe} onTunnel={handleTunnel} />
+          <TouchControls onDirection={handleSwipe} onTunnel={handleTunnel} tunnelCharges={engine.tunnelCharges} />
         )}
 
         {/* Screen overlays */}
