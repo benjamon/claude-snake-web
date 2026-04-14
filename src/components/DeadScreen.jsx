@@ -4,7 +4,7 @@ import Leaderboard from './Leaderboard.jsx';
 export default function DeadScreen({
   score, personalBest, isNewBest, playerName,
   leaderboard, submitFeedback,
-  onPlayAgain, onMenu, onRename, onOpenPalette,
+  onPlayAgain, onMenu, onRename,
 }) {
   const [editing, setEditing] = useState(false);
   const [nameBuf, setNameBuf] = useState(playerName);
@@ -70,7 +70,6 @@ export default function DeadScreen({
 
         <div className="btn-row">
           <button className="btn btn--secondary" onClick={onMenu}>Menu</button>
-          <button className="btn btn--secondary" onClick={onOpenPalette}>Palette</button>
         </div>
       </div>
     </div>

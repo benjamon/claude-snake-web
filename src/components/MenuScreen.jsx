@@ -4,7 +4,7 @@ import { PALETTES } from '../game/constants.js';
 
 export default function MenuScreen({
   playerName, personalBest, palIdx, leaderboard,
-  onPlay, onRename, onPaletteChange, onOpenPalette,
+  onPlay, onRename, onPaletteChange, onHelp,
 }) {
   const [editing, setEditing] = useState(false);
   const [nameBuf, setNameBuf] = useState(playerName);
@@ -33,7 +33,7 @@ export default function MenuScreen({
   }
 
   return (
-    <div className="overlay">
+    <div className="overlay overlay--dark">
       <div className="overlay__content">
         <h1 className="title">SNAKE</h1>
 
@@ -98,7 +98,7 @@ export default function MenuScreen({
 
         <div className="btn-row">
           <button className="btn btn--secondary" onClick={startEdit}>Rename</button>
-          <button className="btn btn--secondary" onClick={onOpenPalette}>Palette</button>
+          <button className="btn btn--secondary" onClick={onHelp}>Help</button>
         </div>
       </div>
     </div>

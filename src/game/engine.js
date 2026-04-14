@@ -167,10 +167,6 @@ export function createEngine() {
     },
 
     reset() {
-      // Save previous game's replay for death-screen playback
-      if (this.replayFrames.length > 0) {
-        this.lastReplay = this.replayFrames;
-      }
       this.replayFrames = [];
       this.replayIndex = 0;
       this.replayTimer = 0;
@@ -321,23 +317,23 @@ export function createEngine() {
       this.replayActive = true;
       this.replayIndex = 0;
       this.replayTimer = 0;
-      // Play back 4x faster than real-time
-      this.replaySpeed = 4;
     },
 
     // Advance replay and return current frame (or null if not replaying)
     updateReplay(dt) {
       if (!this.replayActive || !this.lastReplay) return null;
-      this.replayTimer += dt * this.replaySpeed;
-      // Each original tick was ~tickRate seconds apart; we stored one frame per tick.
-      // Advance at a steady rate regardless of original tick rate.
-      const framesPerSec = 20 * this.replaySpeed; // ~20 ticks/sec base
-      const targetIdx = Math.floor(this.replayTimer * 20);
+      this.replayTimer += dt;
+      // Each frame was recorded once per game tick (~5-8 ticks/sec).
+      // Use 6 frames/sec for approximately 1x playback speed.
+      const targetIdx = Math.floor(this.replayTimer * 6);
       if (targetIdx >= this.lastReplay.length) {
-        // Loop
-        this.replayTimer = 0;
-        this.replayIndex = 0;
-        return this.lastReplay[0];
+        const overTime = (targetIdx - this.lastReplay.length) / 6;
+        if (overTime >= 1.0) {
+          this.replayTimer = 0;
+          this.replayIndex = 0;
+          return this.lastReplay[0];
+        }
+        return this.lastReplay[this.lastReplay.length - 1];
       }
       this.replayIndex = Math.min(targetIdx, this.lastReplay.length - 1);
       return this.lastReplay[this.replayIndex];
@@ -429,8 +425,9 @@ export function createEngine() {
         this.deathExplosionPending = true;
         this.died = true;
         this.newBest = this.score > (parseInt(localStorage.getItem('sn_best') || '0'));
-        // Record final frame
+        // Record final frame and save replay
         this.replayFrames.push(snap(this));
+        this.lastReplay = this.replayFrames;
         if (this.newBest) sndVictory(); else sndDie();
         return;
       }

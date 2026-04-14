@@ -66,8 +66,8 @@ html, body, #root {
 }
 
 .overlay--dark {
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(1.5px);
 }
 
 .overlay__content {
@@ -284,6 +284,28 @@ html, body, #root {
   color: var(--color-dim);
   min-width: 5em;
   text-align: center;
+}
+
+/* ============================================ */
+/*  HELP SCREEN                                 */
+/* ============================================ */
+.help-section {
+  width: 100%;
+  text-align: left;
+}
+
+.help-heading {
+  font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+  color: var(--color-gold);
+  margin: 0 0 2px 0;
+  font-weight: 700;
+}
+
+.help-text {
+  font-size: clamp(0.65rem, 1.6vw, 0.8rem);
+  color: #ccc;
+  margin: 0;
+  line-height: 1.4;
 }
 
 /* ============================================ */

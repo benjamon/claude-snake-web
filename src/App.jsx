@@ -12,6 +12,7 @@ import SetupScreen from './components/SetupScreen.jsx';
 import MenuScreen from './components/MenuScreen.jsx';
 import DeadScreen from './components/DeadScreen.jsx';
 import PaletteEditor from './components/PaletteEditor.jsx';
+import HelpScreen from './components/HelpScreen.jsx';
 import SideIndicators from './components/SideIndicators.jsx';
 import TouchControls from './components/TouchControls.jsx';
 
@@ -38,6 +39,7 @@ export default function App() {
   const [state, setState] = useState(player.current.name ? S.MENU : S.SETUP);
   const [palIdx, setPalIdx] = useState(0);
   const [showPalette, setShowPalette] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [, tick] = useState(0); // force re-render for HUD updates
 
   const engineRef = useRef(createEngine());
@@ -232,7 +234,7 @@ export default function App() {
           <SetupScreen onContinue={handleSetupContinue} />
         )}
 
-        {state === S.MENU && !showPalette && (
+        {state === S.MENU && !showPalette && !showHelp && (
           <MenuScreen
             playerName={playerName}
             personalBest={personalBest}
@@ -241,11 +243,15 @@ export default function App() {
             onPlay={startGame}
             onRename={handleRename}
             onPaletteChange={changePalette}
-            onOpenPalette={() => setShowPalette(true)}
+            onHelp={() => setShowHelp(true)}
           />
         )}
 
-        {state === S.DEAD && !showPalette && (
+        {showHelp && (
+          <HelpScreen onBack={() => setShowHelp(false)} />
+        )}
+
+        {state === S.DEAD && (
           <DeadScreen
             score={deathScore}
             personalBest={personalBest}
@@ -256,7 +262,6 @@ export default function App() {
             onPlayAgain={startGame}
             onMenu={() => { setState(S.MENU); leaderboard.refresh(); }}
             onRename={handleRename}
-            onOpenPalette={() => setShowPalette(true)}
           />
         )}
 
