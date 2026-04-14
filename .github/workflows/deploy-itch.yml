@@ -13,7 +13,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install dependencies
         run: npm ci
@@ -23,17 +23,11 @@ jobs:
           npx vite build --base ''
           node scripts/inline-itch.cjs
 
-      - name: Zip build
-        run: cd dist-itch && zip -r ../claude-snake-web-itch.zip .
-
-      - name: Download butler
-        run: |
-          curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
-          unzip butler.zip
-          chmod +x butler
-          ./butler -V
-
-      - name: Push to itch.io
+      - name: Deploy to itch.io
+        uses: yeslayla/butler-publish-itchio-action@v2.0.2
         env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-        run: ./butler push dist-itch/ ${{ vars.ITCH_TARGET }}:html5
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_API_KEY }}
+          CHANNEL: html5
+          ITCH_GAME: ${{ vars.ITCH_GAME }}
+          ITCH_USER: ${{ vars.ITCH_USER }}
+          PACKAGE: dist-itch/
