@@ -24,7 +24,7 @@ jobs:
           node scripts/inline-itch.cjs
 
       - name: Deploy to itch.io
-        uses: yeslayla/butler-publish-itchio-action@v2.0.2
+        uses: yeslayla/butler-publish-itchio-action@v1.2.0
         env:
           BUTLER_CREDENTIALS: ${{ secrets.BUTLER_API_KEY }}
           CHANNEL: html5
