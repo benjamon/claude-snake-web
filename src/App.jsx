@@ -57,7 +57,7 @@ export default function App() {
     if (state !== S.PLAY) return;
     const id = setInterval(() => {
       tick(n => n + 1);
-      const m = 1 + (engineRef.current.stepCount / 100 | 0);
+      const m = 1 + (engineRef.current.stepCount / 240 | 0) + (engineRef.current.snake.length / 10 | 0);
       if (m > prevMultRef.current) {
         prevMultRef.current = m;
         setMultShake(true);
@@ -68,11 +68,16 @@ export default function App() {
   }, [state]);
 
   // Check for death each frame via polling
+  // Wait for death explosion animation + 2s delay before showing death screen
+  const deathDetectedRef = useRef(false);
   useEffect(() => {
-    if (state !== S.PLAY) return;
+    if (state !== S.PLAY) { deathDetectedRef.current = false; return; }
     const id = setInterval(() => {
       const e = engineRef.current;
-      if (e.died) {
+      if (!e.died) return;
+      // Latch score/best on first detection
+      if (!deathDetectedRef.current) {
+        deathDetectedRef.current = true;
         const sc = e.score;
         const newBest = e.newBest;
         setDeathScore(sc);
@@ -84,6 +89,9 @@ export default function App() {
           setSubmitFeedback(true);
           setTimeout(() => setSubmitFeedback(false), 2500);
         }
+      }
+      // Wait until engine signals death screen is ready
+      if (e.deathScreenReady > 0 && e.gTime >= e.deathScreenReady) {
         e.startReplay();
         setState(S.DEAD);
       }
@@ -263,7 +271,7 @@ export default function App() {
               className="grid-score grid-score--left"
               style={{ right: `calc(100% - ${boardLayout.boardX - 6}px)`, top: boardLayout.boardY }}
             >
-              <div className={`grid-score__mult${multShake ? ' grid-score__mult--shake' : ''}`}>x{1 + (engine.stepCount / 100 | 0)}</div>
+              <div className={`grid-score__mult${multShake ? ' grid-score__mult--shake' : ''}`}>x{1 + (engine.stepCount / 240 | 0) + (engine.snake.length / 10 | 0)}</div>
               <div className="grid-score__val">{engine.score}</div>
             </div>
             <div

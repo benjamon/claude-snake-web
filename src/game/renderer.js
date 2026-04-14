@@ -21,25 +21,34 @@ function renderSnapshot(ctx, frame, layout, alpha) {
   for (let y = 0; y <= ROWS; y++) { ctx.moveTo(0, y * gCell); ctx.lineTo(boardW, y * gCell); }
   ctx.stroke();
 
-  // Wall events
+  // Wall events (drawn as death blocks)
   for (const w of frame.wallEvents) {
-    if (w.warningSteps > 0) {
-      ctx.fillStyle = rgbA(C.WALL, 0.2);
-      if (w.horizontal) ctx.fillRect(0, w.lineIdx * gCell, boardW, gCell);
-      else ctx.fillRect(w.lineIdx * gCell, 0, gCell, boardH);
-    } else if (w.stepsRemaining > 0) {
-      ctx.fillStyle = rgbA(C.WALL, 0.4);
-      if (w.horizontal) ctx.fillRect(0, w.lineIdx * gCell, boardW, gCell);
-      else ctx.fillRect(w.lineIdx * gCell, 0, gCell, boardH);
+    const a = w.warningSteps > 0 ? 0.2 : w.stepsRemaining > 0 ? 0.4 : 0;
+    if (a > 0) {
+      for (const c of w.cells) {
+        ctx.fillStyle = rgbA(C.BLOCK, a);
+        ctx.fillRect(c.x * gCell + 1, c.y * gCell + 1, gCell - 2, gCell - 2);
+        ctx.strokeStyle = rgbA(C.BLOCK_MARK, a * 0.8);
+        ctx.lineWidth = Math.max(1, gCell / 8);
+        const m = gCell * 0.25;
+        ctx.beginPath();
+        ctx.moveTo(c.x * gCell + m, c.y * gCell + m); ctx.lineTo(c.x * gCell + gCell - m, c.y * gCell + gCell - m);
+        ctx.moveTo(c.x * gCell + gCell - m, c.y * gCell + m); ctx.lineTo(c.x * gCell + m, c.y * gCell + gCell - m);
+        ctx.stroke();
+      }
     }
   }
 
   // Death blocks
   for (const b of frame.deathBlocks) {
+    const bx = b.x * gCell + 1, by = b.y * gCell + 1, bw = gCell - 2, bh = gCell - 2;
     ctx.fillStyle = rgb('BLOCK');
-    ctx.fillRect(b.x * gCell + 1, b.y * gCell + 1, gCell - 2, gCell - 2);
-    ctx.strokeStyle = rgbA(C.BLOCK_MARK, 0.8);
-    ctx.lineWidth = Math.max(1, gCell / 8);
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = rgbA(brighten(C.BLOCK_MARK, 0.3), 0.9);
+    ctx.lineWidth = Math.max(1, gCell / 10);
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.strokeStyle = rgbA(brighten(C.BLOCK_MARK, 0.5), 1.0);
+    ctx.lineWidth = Math.max(2, gCell / 6);
     const m = gCell * 0.25;
     ctx.beginPath();
     ctx.moveTo(b.x * gCell + m, b.y * gCell + m); ctx.lineTo(b.x * gCell + gCell - m, b.y * gCell + gCell - m);
@@ -60,6 +69,18 @@ function renderSnapshot(ctx, frame, layout, alpha) {
       ctx.lineWidth = Math.max(2, gCell / 7);
       ctx.beginPath(); ctx.arc(cx, cy, gCell * 0.4, 0, Math.PI * 2); ctx.stroke();
     });
+  }
+
+  // Crown pickups
+  if (frame.crownPickups) for (const cp of frame.crownPickups) {
+    const cx = cp.x * gCell + gCell / 2, cy = cp.y * gCell + gCell / 2;
+    const csz = gCell * 0.36;
+    ctx.fillStyle = 'rgba(255,215,0,0.85)';
+    ctx.beginPath();
+    ctx.moveTo(cx - csz, cy + csz * 0.5); ctx.lineTo(cx - csz, cy - csz * 0.2);
+    ctx.lineTo(cx - csz * 0.5, cy + csz * 0.15); ctx.lineTo(cx, cy - csz * 0.7);
+    ctx.lineTo(cx + csz * 0.5, cy + csz * 0.15); ctx.lineTo(cx + csz, cy - csz * 0.2);
+    ctx.lineTo(cx + csz, cy + csz * 0.5); ctx.closePath(); ctx.fill();
   }
 
   // Food
@@ -115,6 +136,27 @@ function renderSnapshot(ctx, frame, layout, alpha) {
   const hCol = frame.phaseTicks > 0 ? C.PHASE_HEAD : C.HEAD;
   ctx.fillStyle = rgbA(hCol);
   ctx.fillRect(frame.snake[0].x * gCell + 1, frame.snake[0].y * gCell + 1, gCell - 2, gCell - 2);
+
+  // Worn crown (snapshot)
+  if (frame.crown && frame.dir) {
+    const crX = frame.snake[0].x + frame.dir.y;
+    const crY = frame.snake[0].y - frame.dir.x;
+    if (crX >= 0 && crX < COLS && crY >= 0 && crY < ROWS) {
+      const ccx = crX * gCell + gCell / 2, ccy = crY * gCell + gCell / 2;
+      const csz = gCell * 0.36;
+      const angle = Math.atan2(frame.dir.x, frame.dir.y);
+      ctx.save();
+      ctx.translate(ccx, ccy);
+      ctx.rotate(angle);
+      ctx.fillStyle = 'rgba(255,215,0,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(-csz, csz * 0.5); ctx.lineTo(-csz, -csz * 0.2);
+      ctx.lineTo(-csz * 0.5, csz * 0.15); ctx.lineTo(0, -csz * 0.7);
+      ctx.lineTo(csz * 0.5, csz * 0.15); ctx.lineTo(csz, -csz * 0.2);
+      ctx.lineTo(csz, csz * 0.5); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
 
   ctx.restore();
 }
@@ -175,29 +217,53 @@ export function renderGame(ctx, engine, layout) {
   for (let y = 0; y <= ROWS; y++) { ctx.moveTo(0, y * gCell); ctx.lineTo(boardW, y * gCell); }
   ctx.stroke();
 
-  // Wall events
+  // Wall events (drawn as death blocks)
   for (const w of engine.wallEvents) {
     if (w.warningSteps > 0) {
       const fl = (Math.sin(engine.gTime * 14) + 1) * 0.5;
-      ctx.fillStyle = rgbA(C.WALL, fl * 0.35);
-      if (w.horizontal) ctx.fillRect(0, w.lineIdx * gCell, boardW, gCell);
-      else ctx.fillRect(w.lineIdx * gCell, 0, gCell, boardH);
+      const a = fl * 0.35;
+      for (const c of w.cells) {
+        ctx.fillStyle = rgbA(C.BLOCK, a);
+        ctx.fillRect(c.x * gCell + 1, c.y * gCell + 1, gCell - 2, gCell - 2);
+        ctx.strokeStyle = rgbA(C.BLOCK_MARK, a * 0.8);
+        ctx.lineWidth = Math.max(1, gCell / 8);
+        const m = gCell * 0.25;
+        ctx.beginPath();
+        ctx.moveTo(c.x * gCell + m, c.y * gCell + m); ctx.lineTo(c.x * gCell + gCell - m, c.y * gCell + gCell - m);
+        ctx.moveTo(c.x * gCell + gCell - m, c.y * gCell + m); ctx.lineTo(c.x * gCell + m, c.y * gCell + gCell - m);
+        ctx.stroke();
+      }
     } else if (w.stepsRemaining > 0) {
-      const a = Math.min(1, w.stepsRemaining / 10) * 0.65;
-      ctx.fillStyle = rgbA(C.WALL, a);
-      if (w.horizontal) ctx.fillRect(0, w.lineIdx * gCell, boardW, gCell);
-      else ctx.fillRect(w.lineIdx * gCell, 0, gCell, boardH);
+      const a = Math.min(1, w.stepsRemaining / 10) * 0.85;
+      for (const c of w.cells) {
+        ctx.fillStyle = rgbA(C.BLOCK, a);
+        ctx.fillRect(c.x * gCell + 1, c.y * gCell + 1, gCell - 2, gCell - 2);
+        ctx.strokeStyle = rgbA(C.BLOCK_MARK, a * 0.8);
+        ctx.lineWidth = Math.max(1, gCell / 8);
+        const m = gCell * 0.25;
+        ctx.beginPath();
+        ctx.moveTo(c.x * gCell + m, c.y * gCell + m); ctx.lineTo(c.x * gCell + gCell - m, c.y * gCell + gCell - m);
+        ctx.moveTo(c.x * gCell + gCell - m, c.y * gCell + m); ctx.lineTo(c.x * gCell + m, c.y * gCell + gCell - m);
+        ctx.stroke();
+      }
     }
   }
 
   // Death blocks
   for (let i = 0; i < engine.deathBlocks.length; i++) {
     const b = engine.deathBlocks[i], fl = engine.deathBlockFlash[i] || 0;
+    const bx = b.x * gCell + 1, by = b.y * gCell + 1, bw = gCell - 2, bh = gCell - 2;
+    // Fill
     ctx.fillStyle = rgb('BLOCK');
-    ctx.fillRect(b.x * gCell + 1, b.y * gCell + 1, gCell - 2, gCell - 2);
-    if (fl > 0) { ctx.fillStyle = rgbA(C.BLOCK_MARK, fl); ctx.fillRect(b.x * gCell + 1, b.y * gCell + 1, gCell - 2, gCell - 2); }
-    ctx.strokeStyle = rgbA(C.BLOCK_MARK, 0.8);
-    ctx.lineWidth = Math.max(1, gCell / 8);
+    ctx.fillRect(bx, by, bw, bh);
+    if (fl > 0) { ctx.fillStyle = rgbA(C.BLOCK_MARK, fl); ctx.fillRect(bx, by, bw, bh); }
+    // Outline
+    ctx.strokeStyle = rgbA(brighten(C.BLOCK_MARK, 0.3), 0.9);
+    ctx.lineWidth = Math.max(1, gCell / 10);
+    ctx.strokeRect(bx, by, bw, bh);
+    // Bright X
+    ctx.strokeStyle = rgbA(brighten(C.BLOCK_MARK, 0.5), 1.0);
+    ctx.lineWidth = Math.max(2, gCell / 6);
     const m = gCell * 0.25;
     ctx.beginPath();
     ctx.moveTo(b.x * gCell + m, b.y * gCell + m); ctx.lineTo(b.x * gCell + gCell - m, b.y * gCell + gCell - m);
@@ -298,6 +364,32 @@ export function renderGame(ctx, engine, layout) {
     }
   }
 
+  // Crown pickups
+  for (const cp of engine.crownPickups) {
+    const cBob = Math.sin(engine.gTime * 2.8 + cp.x * 0.8 + cp.y * 1.1) * (gCell * 0.105);
+    const age = engine.gTime - (cp.spawnTime || 0);
+    const spawnT = Math.min(age / 0.6, 1);
+    const spawnSc = 3 - 2 * spawnT;
+    const pulse = (Math.sin(engine.gTime * 3.5 + cp.x + cp.y) + 1) * 0.5;
+    const cx = cp.x * gCell + gCell / 2, cy = cp.y * gCell + gCell / 2 + cBob;
+    const sz = (gCell * 0.36) * spawnSc;
+    // Crown shape: 3 pointed crown
+    ctx.fillStyle = `rgba(255,215,0,${0.85 + pulse * 0.15})`;
+    ctx.beginPath();
+    ctx.moveTo(cx - sz, cy + sz * 0.5);
+    ctx.lineTo(cx - sz, cy - sz * 0.2);
+    ctx.lineTo(cx - sz * 0.5, cy + sz * 0.15);
+    ctx.lineTo(cx, cy - sz * 0.7);
+    ctx.lineTo(cx + sz * 0.5, cy + sz * 0.15);
+    ctx.lineTo(cx + sz, cy - sz * 0.2);
+    ctx.lineTo(cx + sz, cy + sz * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    // Gems
+    ctx.fillStyle = `rgba(255,50,50,${0.8 + pulse * 0.2})`;
+    ctx.beginPath(); ctx.arc(cx, cy + sz * 0.1, sz * 0.15, 0, Math.PI * 2); ctx.fill();
+  }
+
   // Food
   {
     const age = engine.gTime - engine.foodSpawnTime;
@@ -383,6 +475,37 @@ export function renderGame(ctx, engine, layout) {
   ctx.fillStyle = 'rgba(0,0,0,0.85)';
   ctx.fillRect(ecx + engine.dir.x * eOff + px * eOff - eSz / 2, ecy + engine.dir.y * eOff + py * eOff - eSz / 2, eSz, eSz);
   ctx.fillRect(ecx + engine.dir.x * eOff - px * eOff - eSz / 2, ecy + engine.dir.y * eOff - py * eOff - eSz / 2, eSz, eSz);
+
+  // Worn crown (rotated to face head)
+  if (engine.crown) {
+    const crX = engine.snake[0].x + engine.dir.y;
+    const crY = engine.snake[0].y - engine.dir.x;
+    if (crX >= 0 && crX < COLS && crY >= 0 && crY < ROWS) {
+      const ccx = crX * gCell + gCell / 2, ccy = crY * gCell + gCell / 2;
+      const csz = gCell * 0.36;
+      const cpulse = (Math.sin(engine.gTime * 4) + 1) * 0.5;
+      // Rotation: crown points "up" by default; rotate so points face toward head
+      // Direction from crown to head is (-dir.y, dir.x)
+      const angle = Math.atan2(engine.dir.x, engine.dir.y);
+      ctx.save();
+      ctx.translate(ccx, ccy);
+      ctx.rotate(angle);
+      ctx.fillStyle = `rgba(255,215,0,${0.9 + cpulse * 0.1})`;
+      ctx.beginPath();
+      ctx.moveTo(-csz, csz * 0.5);
+      ctx.lineTo(-csz, -csz * 0.2);
+      ctx.lineTo(-csz * 0.5, csz * 0.15);
+      ctx.lineTo(0, -csz * 0.7);
+      ctx.lineTo(csz * 0.5, csz * 0.15);
+      ctx.lineTo(csz, -csz * 0.2);
+      ctx.lineTo(csz, csz * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,50,50,${0.85 + cpulse * 0.15})`;
+      ctx.beginPath(); ctx.arc(0, csz * 0.1, csz * 0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
 
   ctx.restore();
 

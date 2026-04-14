@@ -3,7 +3,7 @@ export default function SideIndicators({ tunnelCharges, haloCharges, phaseTicks,
   const { boardX, boardY } = layout;
   const leftX = boardX - 4;
   const rightX = boardX + layout.boardW + 4;
-  const offsetY = boardY + 60;
+  const offsetY = boardY + 100;
 
   return (
     <>

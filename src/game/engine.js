@@ -3,7 +3,7 @@ import {
   sndEat, sndDie, sndVictory, sndPortal,
   sndTunnelPickup, sndTunnelActivate, sndTunnelSpawn,
   sndHaloPickup, sndHaloSave, sndHaloSpawn, sndPortalSpawn,
-  sndDeathBlockSpawn, sndWallWarning,
+  sndDeathBlockSpawn, sndWallWarning, sndDeathHit, sndDeathFinale, sndCrownShatter,
 } from './audio.js';
 
 function rnd(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
@@ -29,6 +29,8 @@ function snap(engine) {
       a: { ...pp.a }, b: { ...pp.b },
       color: pp.color, spawnTime: pp.spawnTime,
     })),
+    crownPickups: engine.crownPickups.map(c => ({ ...c })),
+    crown: engine.crown,
     phaseTicks: engine.phaseTicks,
     score: engine.score,
     stepCount: engine.stepCount,
@@ -45,14 +47,17 @@ export function createEngine() {
     food: null, foodSpawnTime: 0,
     score: 0, tickRate: 0.187, tick: 0, startDelay: 3.0,
     deathBlocks: [], deathBlockFlash: [], tunnelPowerups: [], haloPowerups: [],
-    wallEvents: [], portalPairs: [],
+    wallEvents: [], portalPairs: [], crownPickups: [],
+    crown: null, // { offset cell relative to head based on dir }
     phaseTicks: 0, stepCount: 0, portalCooldown: 0,
     tunnelCharges: 0, haloCharges: 0,
     // FX
     particles: [], floatTexts: [],
-    gTime: 0, shakeX: 0, shakeY: 0, shakeMag: 0,
+    gTime: 0, shakeX: 0, shakeY: 0, shakeMag: 0, deathExplosionPending: false,
+    deathExplosionQueue: null, // { cells, elapsed, nextIdx }
+    portalTrail: null, // { from, to, color, elapsed, duration }
     // Events (set per frame, read by React)
-    died: false, newBest: false,
+    died: false, newBest: false, deathScreenReady: 0,
     // Replay recording
     replayFrames: [],
     replayIndex: 0,
@@ -69,6 +74,7 @@ export function createEngine() {
       for (const h of this.haloPowerups) if (h.x === c.x && h.y === c.y) return true;
       for (const pp of this.portalPairs)
         if ((pp.a.x === c.x && pp.a.y === c.y) || (pp.b.x === c.x && pp.b.y === c.y)) return true;
+      for (const cr of this.crownPickups) if (cr.x === c.x && cr.y === c.y) return true;
       return false;
     },
 
@@ -82,7 +88,16 @@ export function createEngine() {
     trySpawnFood() {
       while (true) {
         const c = { x: rnd(0, COLS - 1), y: rnd(0, ROWS - 1) };
-        if (!this.cellOccupied(c, true)) return c;
+        if (this.cellOccupied(c, true)) continue;
+        // Don't spawn on active or warning wall cells
+        let onWall = false;
+        for (const w of this.wallEvents) {
+          if (w.stepsRemaining === 0) continue; // expired
+          for (const wc of w.cells)
+            if (wc.x === c.x && wc.y === c.y) { onWall = true; break; }
+          if (onWall) break;
+        }
+        if (!onWall) return c;
       }
     },
 
@@ -119,7 +134,7 @@ export function createEngine() {
         if (this.cellOccupied(ca)) continue;
         for (let tb = 0; tb < 500; tb++) {
           const cb = { x: rnd(1, COLS - 2), y: rnd(1, ROWS - 2) };
-          if (Math.abs(cb.x - ca.x) + Math.abs(cb.y - ca.y) < 5) continue;
+          if (Math.abs(cb.x - ca.x) + Math.abs(cb.y - ca.y) < 6) continue;
           if (this.cellOccupied(cb)) continue;
           this.portalPairs.push({ a: ca, b: cb, color, spawnTime: this.gTime });
           this.burst(ca.x, ca.y, 10, 40, 160, 3, 8, 0.3, 0.6, [color, [255, 255, 255]]);
@@ -133,7 +148,22 @@ export function createEngine() {
       sndWallWarning();
       const horizontal = Math.random() < 0.5;
       const lineIdx = rnd(0, (horizontal ? ROWS : COLS) - 1);
-      this.wallEvents.push({ horizontal, lineIdx, warningSteps: 10, stepsRemaining: -1, cells: [] });
+      // Pre-compute cells, skipping any that overlap portals, powerups, or food
+      const cells = [];
+      const len = horizontal ? COLS : ROWS;
+      for (let i = 0; i < len; i++) {
+        const c = horizontal ? { x: i, y: lineIdx } : { x: lineIdx, y: i };
+        let skip = false;
+        if (this.food && this.food.x === c.x && this.food.y === c.y) skip = true;
+        for (const pp of this.portalPairs)
+          if ((pp.a.x === c.x && pp.a.y === c.y) || (pp.b.x === c.x && pp.b.y === c.y)) { skip = true; break; }
+        for (const t of this.tunnelPowerups)
+          if (t.x === c.x && t.y === c.y) { skip = true; break; }
+        for (const h of this.haloPowerups)
+          if (h.x === c.x && h.y === c.y) { skip = true; break; }
+        if (!skip) cells.push(c);
+      }
+      this.wallEvents.push({ horizontal, lineIdx, warningSteps: 10, stepsRemaining: -1, cells });
     },
 
     reset() {
@@ -153,11 +183,13 @@ export function createEngine() {
       this.dir = { x: 1, y: 0 }; this.inputQ = [];
       this.score = 0; this.tick = 0; this.tickRate = 0.187; this.startDelay = 3.0;
       this.deathBlocks = []; this.deathBlockFlash = []; this.tunnelPowerups = []; this.haloPowerups = [];
-      this.wallEvents = []; this.portalPairs = [];
+      this.wallEvents = []; this.portalPairs = []; this.crownPickups = [];
+      this.crown = null;
       this.phaseTicks = 0; this.stepCount = 0; this.portalCooldown = 0;
       this.tunnelCharges = 0; this.haloCharges = 0;
-      this.particles = []; this.floatTexts = []; this.shakeMag = 0;
-      this.died = false; this.newBest = false;
+      this.particles = []; this.floatTexts = []; this.shakeMag = 0; this.portalTrail = null;
+      this.died = false; this.newBest = false; this.deathExplosionPending = false;
+      this.deathExplosionQueue = null; this.deathScreenReady = 0;
       this.spawnPortalPair();
       this.food = this.trySpawnFood(); this.foodSpawnTime = this.gTime;
       this.trySpawn(0, COLS - 1, c => this.tunnelPowerups.push({ ...c, spawnTime: this.gTime }));
@@ -223,13 +255,60 @@ export function createEngine() {
         const f = this.floatTexts[i]; f.y += f.vy * dt; f.li -= dt;
         if (f.li <= 0) this.floatTexts.splice(i, 1);
       }
+      // Staggered death explosion
+      if (this.deathExplosionQueue) {
+        const q = this.deathExplosionQueue;
+        q.elapsed += dt;
+        if (!q.finaleSpawned) {
+          const targetIdx = Math.floor(q.elapsed / 0.08);
+          while (q.nextIdx <= targetIdx && q.nextIdx < q.cells.length) {
+            const s = q.cells[q.nextIdx];
+            this.burst(s.x, s.y, 15, 20, 100, 2, 6, 0.2, 0.5,
+              [[80, 220, 80], [140, 255, 100], [220, 255, 80], [255, 255, 255]]);
+            if (q.nextIdx % 3 === 0) sndDeathHit();
+            q.nextIdx++;
+          }
+          if (q.nextIdx >= q.cells.length) {
+            // Big finale: burst on every snake block simultaneously
+            for (const s of q.cells) {
+              this.burst(s.x, s.y, 7, 30, 140, 3, 8, 0.3, 0.7,
+                [[80, 220, 80], [140, 255, 100], [220, 255, 80], [255, 255, 255]]);
+            }
+            sndDeathFinale();
+            this.shakeMag = Math.max(this.shakeMag, 12);
+            q.finaleSpawned = true;
+            q.finaleTime = this.gTime;
+          }
+        } else if (this.gTime >= q.finaleTime + 1.0) {
+          this.deathExplosionQueue = null;
+          this.deathScreenReady = this.gTime;
+        }
+      }
+      // Staggered portal trail
+      if (this.portalTrail) {
+        const tr = this.portalTrail;
+        tr.elapsed += dt;
+        const progress = Math.min(tr.elapsed / tr.duration, 1);
+        const targetBursts = Math.floor(progress * tr.totalBursts);
+        while (tr.emitted <= targetBursts && tr.emitted < tr.totalBursts) {
+          const t = tr.emitted / (tr.totalBursts - 1);
+          this.burst(
+            tr.from.x + (tr.to.x - tr.from.x) * t,
+            tr.from.y + (tr.to.y - tr.from.y) * t,
+            3, 20, 70, 2, 5, 0.25, 0.55, [tr.color, tr.headColor]
+          );
+          tr.emitted++;
+        }
+        if (tr.emitted >= tr.totalBursts) this.portalTrail = null;
+      }
     },
 
     deathExplosion() {
-      for (const s of this.snake) {
-        this.burst(s.x, s.y, 3, 20, 100, 2, 6, 0.2, 0.5,
-          [[80, 220, 80], [140, 255, 100], [220, 255, 80], [255, 255, 255]]);
-      }
+      // Queue staggered explosions from head to tail
+      this.deathExplosionQueue = {
+        cells: this.snake.map(s => ({ x: s.x, y: s.y })),
+        elapsed: 0, nextIdx: 0, finaleSpawned: false, finaleTime: 0,
+      };
     },
 
     foodExplosion(cellX, cellY) {
@@ -271,6 +350,12 @@ export function createEngine() {
       this.shakeX = (Math.random() * 2 - 1) * this.shakeMag;
       this.shakeY = (Math.random() * 2 - 1) * this.shakeMag;
 
+      // Fire death particles once shake subsides
+      if (this.deathExplosionPending && this.shakeMag <= 0.5) {
+        this.deathExplosionPending = false;
+        this.deathExplosion();
+      }
+
       if (this.died) return; // stop game logic after death, but FX above still run
 
       for (let i = 0; i < this.deathBlockFlash.length; i++)
@@ -290,9 +375,12 @@ export function createEngine() {
       let head = { x: this.snake[0].x + this.dir.x, y: this.snake[0].y + this.dir.y };
       let phasing = (this.phaseTicks > 0);
 
+      let wrapped = false;
       if (phasing) {
-        head.x = ((head.x % COLS) + COLS) % COLS;
-        head.y = ((head.y % ROWS) + ROWS) % ROWS;
+        const wx = ((head.x % COLS) + COLS) % COLS;
+        const wy = ((head.y % ROWS) + ROWS) % ROWS;
+        if (wx !== head.x || wy !== head.y) wrapped = true;
+        head.x = wx; head.y = wy;
       }
 
       // Portals
@@ -301,16 +389,15 @@ export function createEngine() {
         const hitB = head.x === pp.b.x && head.y === pp.b.y;
         if (hitA || hitB) {
           const from = hitA ? pp.a : pp.b, to = hitA ? pp.b : pp.a;
+          const hCol = this.phaseTicks > 0 ? C.PHASE_HEAD : C.HEAD;
           head = { ...to }; this.portalCooldown = 1; sndPortal();
           this.shakeMag = Math.max(this.shakeMag, 4); // portal shake
-          for (let s = 0; s <= 12; s++) {
-            const t = s / 12;
-            this.burst(
-              from.x + (to.x - from.x) * t,
-              from.y + (to.y - from.y) * t,
-              3, 20, 70, 2, 5, 0.25, 0.55, [pp.color, C.PHASE_HEAD]
-            );
-          }
+          // Stagger particle trail over the cooldown period
+          this.portalTrail = {
+            from, to, color: pp.color, headColor: hCol,
+            elapsed: 0, duration: this.tickRate,
+            emitted: 0, totalBursts: 13,
+          };
           break;
         }
       }
@@ -338,8 +425,8 @@ export function createEngine() {
       }
 
       if (dead) {
-        this.deathExplosion();
         this.shakeMag = 20; // big death shake
+        this.deathExplosionPending = true;
         this.died = true;
         this.newBest = this.score > (parseInt(localStorage.getItem('sn_best') || '0'));
         // Record final frame
@@ -364,15 +451,49 @@ export function createEngine() {
           this.haloPowerups.splice(i, 1); sndHaloPickup(); break;
         }
 
+      // Collect crown pickups
+      for (let i = this.crownPickups.length - 1; i >= 0; i--)
+        if (this.crownPickups[i].x === head.x && this.crownPickups[i].y === head.y) {
+          this.crown = true;
+          const pts = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
+          this.score += pts;
+          this.floatText(head.x, head.y, `+${pts}`, [255, 215, 0], 1.25, -8);
+          this.burst(head.x, head.y, 14, 30, 130, 3, 8, 0.3, 0.7, [[255, 215, 0], [255, 255, 150], [200, 160, 0]]);
+          this.shakeMag = Math.max(this.shakeMag, 5);
+          this.crownPickups.splice(i, 1); sndHaloPickup(); break;
+        }
+
+      // Crown: award points and check if destroyed
+      if (this.crown) {
+        const crownCell = { x: head.x + this.dir.y, y: head.y - this.dir.x };
+        let crownDead = wrapped;
+        if (!crownDead) crownDead = crownCell.x < 0 || crownCell.x >= COLS || crownCell.y < 0 || crownCell.y >= ROWS;
+        if (!crownDead) for (const b of this.deathBlocks)
+          if (b.x === crownCell.x && b.y === crownCell.y) { crownDead = true; break; }
+        if (!crownDead) for (const w of this.wallEvents)
+          if (w.stepsRemaining > 0) for (const c of w.cells)
+            if (c.x === crownCell.x && c.y === crownCell.y) { crownDead = true; break; }
+        if (crownDead) {
+          this.crown = null;
+          const oob = wrapped || crownCell.x < 0 || crownCell.x >= COLS || crownCell.y < 0 || crownCell.y >= ROWS;
+          this.burst(oob ? head.x : crownCell.x, oob ? head.y : crownCell.y,
+            16, 20, 80, 2, 5, 0.2, 0.5, [[255, 215, 0], [200, 160, 0]]);
+          sndCrownShatter();
+        } else if (this.stepCount % 6 === 0) {
+          const pts = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
+          this.score += pts;
+          this.floatText(crownCell.x, crownCell.y, `+${pts}`, [255, 215, 0], 0.8, -6);
+        }
+      }
+
       const ate = head.x === this.food.x && head.y === this.food.y;
       this.snake.unshift(head); this.snakeGhost.unshift(phasing); this.snakeDir.unshift({ ...this.dir });
 
       if (ate) {
         this.foodExplosion(this.food.x, this.food.y);
-        const pts = 1 + (this.stepCount / 100 | 0);
+        const pts = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
         this.floatText(this.food.x, this.food.y, `+${pts}`, C.FOOD, 1.25, -8);
-        if (pts > 1) this.floatText(this.food.x, this.food.y - 0.8, `x${pts}`, [255, 220, 80], 1.25, -8);
-        if (!phasing) sndEat();
+        sndEat();
         this.score += pts; this.food = this.trySpawnFood(); this.foodSpawnTime = this.gTime;
         this.tickRate = Math.max(0.066, this.tickRate - 0.0008);
         this.tick = -this.tickRate * 0.5; // half-step pause after eating
@@ -390,15 +511,13 @@ export function createEngine() {
       if (this.stepCount % 200 === 0) this.trySpawn(0, COLS - 1, c => { this.haloPowerups.push(c); sndHaloSpawn(); });
       if (this.stepCount > 0 && this.stepCount % 250 === 0) { this.spawnPortalPair(); sndPortalSpawn(); }
       if (this.stepCount > 0 && this.stepCount % 300 === 0) this.spawnWall();
+      if (this.stepCount > 0 && this.stepCount % 225 === 0) this.trySpawn(1, COLS - 2, c => this.crownPickups.push({ ...c, spawnTime: this.gTime }));
 
       // Wall timers
       for (const w of this.wallEvents) {
         if (w.warningSteps > 0) {
           if (--w.warningSteps === 0) {
-            w.stepsRemaining = 50;
-            const len = w.horizontal ? COLS : ROWS;
-            for (let i = 0; i < len; i++)
-              w.cells.push(w.horizontal ? { x: i, y: w.lineIdx } : { x: w.lineIdx, y: i });
+            w.stepsRemaining = 48;
           }
         } else if (w.stepsRemaining > 0) w.stepsRemaining--;
       }

@@ -162,6 +162,29 @@ export function sndPortalSpawn() {
   makeOsc('triangle', 600, t + 0.15, t + 0.45, 0.15, 0.15, 0.001, 1200);
 }
 
+export function sndCrownShatter() {
+  ensureAudio(); const t = audioCtx.currentTime;
+  // Glass-like shatter: high freq burst with noise-like harmonics
+  makeOsc('square', 2200, t, t + 0.08, 0.25, 0.25, 0.001, 800);
+  makeOsc('sawtooth', 3400, t, t + 0.12, 0.15, 0.15, 0.001, 600);
+  makeOsc('sine', 1600, t + 0.02, t + 0.15, 0.2, 0.2, 0.001, 400);
+  // Low thud underneath
+  makeOsc('sine', 120, t, t + 0.1, 0.2, 0.2, 0.001, 60);
+}
+
+export function sndDeathHit() {
+  ensureAudio(); const t = audioCtx.currentTime;
+  makeOsc('square', 180, t, t + 0.08, 0.3, 0.3, 0.001, 90);
+  makeOsc('sawtooth', 260, t, t + 0.06, 0.2, 0.2, 0.001, 120);
+}
+
+export function sndDeathFinale() {
+  ensureAudio(); const t = audioCtx.currentTime;
+  makeOsc('sawtooth', 100, t, t + 0.4, 0.35, 0.35, 0.001, 40);
+  makeOsc('square', 200, t, t + 0.35, 0.2, 0.2, 0.001, 60);
+  makeOsc('sine', 150, t + 0.05, t + 0.45, 0.25, 0.25, 0.001, 30);
+}
+
 // ---- Background music ----
 let bgAudio = null;
 let bgRunning = false, bgTimer = null;
