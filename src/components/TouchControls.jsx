@@ -20,8 +20,6 @@ export default function TouchControls({ onDirection, onTunnel, tunnelCharges }) 
     // Normalize to -1..1 from center
     const nx = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
     const ny = ((touch.clientY - rect.top) / rect.height) * 2 - 1;
-    // Dead zone: ignore if close to center (within 15% of half-size)
-    if (Math.abs(nx) < 0.10 && Math.abs(ny) < 0.10) return;
     // Pick direction based on which axis is dominant
     if (Math.abs(nx) > Math.abs(ny)) {
       onDirection(nx > 0 ? DIRS.right : DIRS.left);
