@@ -173,6 +173,10 @@ html, body, #root {
   color: var(--color-dim);
 }
 
+.btn--muted {
+  opacity: 0.5;
+}
+
 .btn--icon {
   padding: clamp(6px, 1.2vh, 12px);
   min-width: clamp(36px, 5vw, 48px);

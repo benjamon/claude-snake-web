@@ -274,7 +274,7 @@ function renderSnapshot(ctx, frame, layout, alpha, replayTime) {
       const ccx = crX * gCell + gCell / 2, ccy = crY * gCell + gCell / 2;
       const csz = gCell * 0.36;
       const cpulse = (Math.sin(gt * 4) + 1) * 0.5;
-      const angle = Math.atan2(frame.dir.x, frame.dir.y);
+      const angle = Math.atan2(frame.dir.y, frame.dir.x);
       ctx.save();
       ctx.translate(ccx, ccy);
       ctx.rotate(angle);
@@ -617,7 +617,7 @@ export function renderGame(ctx, engine, layout) {
       const cpulse = (Math.sin(engine.gTime * 4) + 1) * 0.5;
       // Rotation: crown points "up" by default; rotate so points face toward head
       // Direction from crown to head is (-dir.y, dir.x)
-      const angle = Math.atan2(engine.dir.x, engine.dir.y);
+      const angle = Math.atan2(engine.dir.y, engine.dir.x);
       ctx.save();
       ctx.translate(ccx, ccy);
       ctx.rotate(angle);

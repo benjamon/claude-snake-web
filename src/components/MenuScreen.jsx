@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Leaderboard from './Leaderboard.jsx';
 import { PALETTES } from '../game/constants.js';
+import { setSfxMuted, setMusicMuted, isSfxMuted, isMusicMuted } from '../game/audio.js';
 
 export default function MenuScreen({
   playerName, personalBest, palIdx, leaderboard,
@@ -8,6 +9,8 @@ export default function MenuScreen({
 }) {
   const [editing, setEditing] = useState(false);
   const [nameBuf, setNameBuf] = useState(playerName);
+  const [sfxOff, setSfxOff] = useState(isSfxMuted());
+  const [musOff, setMusOff] = useState(isMusicMuted());
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -99,6 +102,21 @@ export default function MenuScreen({
         <div className="btn-row">
           <button className="btn btn--secondary" onClick={startEdit}>Rename</button>
           <button className="btn btn--secondary" onClick={onHelp}>Help</button>
+        </div>
+
+        <div className="btn-row">
+          <button
+            className={`btn btn--ghost${sfxOff ? ' btn--muted' : ''}`}
+            onClick={() => { const v = !sfxOff; setSfxOff(v); setSfxMuted(v); }}
+          >
+            SFX: {sfxOff ? 'OFF' : 'ON'}
+          </button>
+          <button
+            className={`btn btn--ghost${musOff ? ' btn--muted' : ''}`}
+            onClick={() => { const v = !musOff; setMusOff(v); setMusicMuted(v); }}
+          >
+            Music: {musOff ? 'OFF' : 'ON'}
+          </button>
         </div>
       </div>
     </div>

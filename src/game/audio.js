@@ -1,11 +1,12 @@
 let audioCtx = null;
 let masterGain = null;
+let sfxMuted = false, musicMuted = false;
 
 export function ensureAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.45;
+    masterGain.gain.value = sfxMuted ? 0 : 0.45;
     masterGain.connect(audioCtx.destination);
   }
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -250,3 +251,20 @@ export function stopBgMusic() {
   if (bgAudio && bgUsingFile) { bgAudio.pause(); }
   if (bgTimer) { clearTimeout(bgTimer); bgTimer = null; }
 }
+
+export function setSfxMuted(m) {
+  sfxMuted = m;
+  if (masterGain) masterGain.gain.value = m ? 0 : 0.45;
+}
+
+export function setMusicMuted(m) {
+  musicMuted = m;
+  if (bgAudio) bgAudio.volume = m ? 0 : 0.45;
+  // For synth music, master gain already covers it when sfx is also muted;
+  // if only music is muted, stop/start the synth loop
+  if (m && bgRunning && !bgUsingFile) { if (bgTimer) { clearTimeout(bgTimer); bgTimer = null; } }
+  if (!m && bgRunning && !bgUsingFile && !bgTimer) bgScheduleLoop();
+}
+
+export function isSfxMuted() { return sfxMuted; }
+export function isMusicMuted() { return musicMuted; }
