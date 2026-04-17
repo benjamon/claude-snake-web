@@ -817,3 +817,61 @@ html, body, #root {
   border-color: rgba(120, 120, 120, 0.25);
   color: rgba(120, 120, 120, 0.35);
 }
+
+.touch-tunnel-btn--highlight {
+  background: rgba(100, 210, 255, 0.35);
+  border-color: rgba(200, 240, 255, 0.95);
+  color: rgba(230, 250, 255, 1);
+  box-shadow: 0 0 16px rgba(120, 210, 255, 0.7), 0 0 30px rgba(120, 210, 255, 0.35);
+  animation: tut-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes tut-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(120, 210, 255, 0.6); transform: scale(1); }
+  50%      { box-shadow: 0 0 22px rgba(120, 210, 255, 0.95); transform: scale(1.06); }
+}
+
+/* ============================================ */
+/*  TUTORIAL OVERLAY                            */
+/* ============================================ */
+.tutorial-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px 20px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 20;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+}
+
+.tutorial-message {
+  color: rgba(240, 240, 240, 0.95);
+  font-family: var(--font);
+  font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  line-height: 1.35;
+  text-align: center;
+  max-width: 640px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.tutorial-message b, .tutorial-message strong {
+  color: rgb(255, 215, 0);
+}
+
+.tutorial-buttons {
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+@media (pointer: coarse) {
+  .tutorial-overlay {
+    /* Leave room for the on-screen controls */
+    bottom: 170px;
+  }
+}

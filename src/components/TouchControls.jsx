@@ -7,7 +7,7 @@ const DIRS = {
   right: { x: 1, y: 0 },
 };
 
-export default function TouchControls({ onDirection, onTunnel, tunnelCharges }) {
+export default function TouchControls({ onDirection, onTunnel, tunnelCharges, highlightTunnel }) {
   const dpadRef = useRef(null);
 
   const handleDpadStart = useCallback((e) => {
@@ -62,7 +62,11 @@ export default function TouchControls({ onDirection, onTunnel, tunnelCharges }) 
         <div className="touch-dpad__cross" />
       </div>
       <button
-        className={`touch-tunnel-btn${disabled ? ' touch-tunnel-btn--disabled' : ''}`}
+        className={
+          'touch-tunnel-btn' +
+          (disabled ? ' touch-tunnel-btn--disabled' : '') +
+          (highlightTunnel ? ' touch-tunnel-btn--highlight' : '')
+        }
         onTouchStart={disabled ? undefined : handleTunnelStart}
         onPointerDown={(e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); }}
       >

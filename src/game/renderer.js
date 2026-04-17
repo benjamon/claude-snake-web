@@ -312,6 +312,28 @@ function renderSnapshot(ctx, frame, layout, alpha, replayTime) {
     }
   }
 
+  // Halo save anim
+  if (frame.haloSaveAnim) {
+    const dur = 0.8;
+    const t = ((frame.gTime || 0) - frame.haloSaveAnim.startTime) / dur;
+    if (t >= 0 && t < 1) {
+      const cx = frame.haloSaveAnim.x * gCell + gCell / 2;
+      const cy = frame.haloSaveAnim.y * gCell + gCell / 2;
+      const scale = 0.4 + t * 1.8;
+      const alpha = 1 - t;
+      const r = gCell * 0.5 * scale;
+      const lw = Math.max(2, gCell / 5);
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = `rgba(255,220,80,${alpha * 0.95})`;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,210,${alpha * 0.7})`;
+      ctx.lineWidth = Math.max(1, lw * 0.45);
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = `rgba(255,245,170,${alpha * 0.35})`;
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.32, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
   ctx.restore();
 }
 
@@ -323,8 +345,9 @@ export function renderGame(ctx, engine, layout) {
   ctx.fillStyle = rgb('BG');
   ctx.fillRect(0, 0, canvasW, canvasH);
 
-  // If game hasn't been initialized yet, just show background + FX
-  if (!engine.food) {
+  // If game hasn't been initialized yet, just show background + FX.
+  // Tutorial stages intentionally start with no food, so keep rendering there.
+  if (!engine.food && !engine.tutorialMode) {
     // If there's a replay, render it as background
     if (engine.replayActive) {
       const frame = engine.updateReplay(1 / 60);
@@ -544,7 +567,7 @@ export function renderGame(ctx, engine, layout) {
   }
 
   // Food
-  {
+  if (engine.food) {
     const age = engine.gTime - engine.foodSpawnTime;
     const t = Math.min(age / 0.6, 1);
     const sc = 3 - 2 * t;
@@ -678,6 +701,28 @@ export function renderGame(ctx, engine, layout) {
         offsetY -= 0.85 * csz * scale;
       }
       ctx.restore();
+    }
+  }
+
+  // Halo save anim — expanding golden ring over the snake head
+  if (engine.haloSaveAnim) {
+    const dur = 0.8;
+    const t = (engine.gTime - engine.haloSaveAnim.startTime) / dur;
+    if (t >= 0 && t < 1) {
+      const cx = engine.haloSaveAnim.x * gCell + gCell / 2;
+      const cy = engine.haloSaveAnim.y * gCell + gCell / 2;
+      const scale = 0.4 + t * 1.8;
+      const alpha = 1 - t;
+      const r = gCell * 0.5 * scale;
+      const lw = Math.max(2, gCell / 5);
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = `rgba(255,220,80,${alpha * 0.95})`;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,210,${alpha * 0.7})`;
+      ctx.lineWidth = Math.max(1, lw * 0.45);
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = `rgba(255,245,170,${alpha * 0.35})`;
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.32, 0, Math.PI * 2); ctx.fill();
     }
   }
 

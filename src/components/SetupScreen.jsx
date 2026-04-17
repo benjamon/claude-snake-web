@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 
-export default function SetupScreen({ onContinue }) {
-  const [name, setName] = useState('');
+export default function SetupScreen({ onContinue, initialName }) {
+  const [name, setName] = useState(initialName || '');
   const inputRef = useRef(null);
 
   useEffect(() => {
