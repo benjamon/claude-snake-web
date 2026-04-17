@@ -29,27 +29,25 @@ const TUT_MSG = (isTouch) => [
     : 'Phasing lets you burrow under obstacles and wrap the screen. Press SPACE to phase.',
   'Portals let you teleport across the map.',
   'Halos make you phase when you would die.',
-  'The crown gives you points when you have it on — but it\u2019s fragile, so go **crownter-clockwise** to avoid obstacles.',
+  'The crown gives you points \u2014 don\u2019t break it!',
 ];
 
 function applyTutorialStage(engine, stage) {
   engine.tutorialReset();
   const mx = COLS / 2 | 0, my = ROWS / 2 | 0;
-  if (stage >= 1) {
-    engine.growSnake(10);
-  }
-  if (stage >= 2) {
+  // Longer snake so lessons read clearly, applied every stage past the intro
+  if (stage >= 1) engine.growSnake(10);
+  if (stage === 2) {
     engine.addPortalPair(mx + 4, my, 2, 3, PORTAL_COLORS[0]);
-  }
-  if (stage >= 3) {
+  } else if (stage === 3) {
     engine.haloCharges = 1;
-    // Wall of death blocks ahead of the snake; halo forces phase save
     for (let y = my - 2; y <= my + 2; y++) engine.addDeathBlockAt(mx + 3, y);
     for (let y = my - 1; y <= my + 1; y++) engine.addDeathBlockAt(mx + 5, y);
-  }
-  if (stage >= 4) {
+  } else if (stage === 4) {
     engine.setFoodAt(mx + 3, my);
   }
+  // Give the player 4x the normal tick to read the new instruction before moving
+  engine.tick = -engine.tickRate * 3;
 }
 
 function applyStage4Post(engine) {
@@ -292,22 +290,23 @@ export default function App() {
     setState(S.TUTORIAL);
   }, []);
 
+  const finishTutorial = useCallback(() => {
+    engineRef.current.tutorialMode = false;
+    setState(playerName ? S.MENU : S.SETUP);
+  }, [playerName]);
+
   const advanceTutorial = useCallback(() => {
     setTutStage(s => {
       const next = s + 1;
       if (next > 4) {
-        engineRef.current.tutorialMode = false;
-        setState(S.SETUP);
+        finishTutorial();
         return 0;
       }
       return next;
     });
-  }, []);
+  }, [finishTutorial]);
 
-  const skipTutorial = useCallback(() => {
-    engineRef.current.tutorialMode = false;
-    setState(playerName ? S.MENU : S.SETUP);
-  }, [playerName]);
+  const skipTutorial = finishTutorial;
 
   const changePalette = useCallback((dir) => {
     setPalIdx(prev => {
@@ -383,6 +382,7 @@ export default function App() {
             nextLabel={tutStage === 4 ? 'Finish Tutorial \u25B6' : 'Next \u25B6'}
             onNext={advanceTutorial}
             onSkip={skipTutorial}
+            layout={boardLayout}
           />
         )}
 

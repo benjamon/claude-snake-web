@@ -4,10 +4,17 @@ function renderMessage(msg) {
 }
 
 export default function TutorialScreen({
-  message, showNext, onNext, nextLabel, onSkip,
+  message, showNext, onNext, nextLabel, onSkip, layout,
 }) {
+  if (!layout) return null;
+  const half = layout.gCell * 0.5;
+  const style = {
+    left: layout.boardX + half,
+    width: layout.boardW - layout.gCell,
+    bottom: layout.canvasH - (layout.boardY + layout.boardH) + half,
+  };
   return (
-    <div className="tutorial-overlay">
+    <div className="tutorial-overlay" style={style}>
       <div className="tutorial-message">{renderMessage(message)}</div>
       <div className="tutorial-buttons">
         {showNext && (
