@@ -7,7 +7,7 @@ const DIRS = {
   right: { x: 1, y: 0 },
 };
 
-export default function TouchControls({ onDirection, onTunnel, phaseCooldown, phaseTicks, highlightTunnel }) {
+export default function TouchControls({ onDirection, onBurrow, burrowCooldown, burrowTicks, highlightBurrow }) {
   const dpadRef = useRef(null);
 
   const handleDpadStart = useCallback((e) => {
@@ -28,13 +28,13 @@ export default function TouchControls({ onDirection, onTunnel, phaseCooldown, ph
     }
   }, [onDirection]);
 
-  const handleTunnelStart = useCallback((e) => {
+  const handleBurrowStart = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    onTunnel();
-  }, [onTunnel]);
+    onBurrow();
+  }, [onBurrow]);
 
-  const disabled = phaseCooldown > 0 || phaseTicks > 0;
+  const disabled = burrowCooldown > 0 || burrowTicks > 0;
   const iconSize = '28%';
 
   return (
@@ -45,7 +45,6 @@ export default function TouchControls({ onDirection, onTunnel, phaseCooldown, ph
         onTouchStart={handleDpadStart}
         onPointerDown={(e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); }}
       >
-        {/* Arrow icons positioned in the four quadrants */}
         <svg className="touch-dpad__icon touch-dpad__icon--up" viewBox="0 0 24 24" width={iconSize} height={iconSize}>
           <path d="M12 4 L4 18 L20 18 Z" fill="currentColor"/>
         </svg>
@@ -58,19 +57,18 @@ export default function TouchControls({ onDirection, onTunnel, phaseCooldown, ph
         <svg className="touch-dpad__icon touch-dpad__icon--right" viewBox="0 0 24 24" width={iconSize} height={iconSize}>
           <path d="M20 12 L6 4 L6 20 Z" fill="currentColor"/>
         </svg>
-        {/* Subtle cross divider */}
         <div className="touch-dpad__cross" />
       </div>
       <button
         className={
-          'touch-tunnel-btn' +
-          (disabled ? ' touch-tunnel-btn--disabled' : '') +
-          (highlightTunnel ? ' touch-tunnel-btn--highlight' : '')
+          'touch-burrow-btn' +
+          (disabled ? ' touch-burrow-btn--disabled' : '') +
+          (highlightBurrow ? ' touch-burrow-btn--highlight' : '')
         }
-        onTouchStart={disabled ? undefined : handleTunnelStart}
+        onTouchStart={disabled ? undefined : handleBurrowStart}
         onPointerDown={(e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); }}
       >
-        {phaseCooldown > 0 && phaseTicks === 0 ? phaseCooldown : 'PHASE'}
+        {burrowCooldown > 0 && burrowTicks === 0 ? burrowCooldown : 'BURROW'}
       </button>
     </div>
   );

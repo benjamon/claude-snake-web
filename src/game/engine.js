@@ -34,10 +34,10 @@ function snap(engine) {
     crownFreezeTicks: engine.crownFreezeTicks,
     crownUpgradeStartTime: engine.crownUpgradeStartTime,
     haloSaveAnim: engine.haloSaveAnim ? { ...engine.haloSaveAnim } : null,
-    phaseTicks: engine.phaseTicks,
+    burrowTicks: engine.burrowTicks,
     score: engine.score,
     stepCount: engine.stepCount,
-    phaseCooldown: engine.phaseCooldown,
+    burrowCooldown: engine.burrowCooldown,
     haloCharges: engine.haloCharges,
     gTime: engine.gTime,
   };
@@ -57,7 +57,7 @@ export function createEngine() {
     tutorialMode: false,
     tutorialRestartPending: false,
     tutorialAppleEaten: false,
-    phaseTicks: 0, phaseCooldown: 0, stepCount: 0, portalCooldown: 0,
+    burrowTicks: 0, burrowCooldown: 0, stepCount: 0, portalCooldown: 0,
     haloCharges: 0,
     // FX
     particles: [], floatTexts: [],
@@ -188,7 +188,7 @@ export function createEngine() {
       this.crown = null;
       this.crownApplesEaten = 0; this.crownFreezeTicks = 0; this.crownUpgradeStartTime = -1;
       this.haloSaveAnim = null;
-      this.phaseTicks = 0; this.phaseCooldown = 0; this.stepCount = 0; this.portalCooldown = 0;
+      this.burrowTicks = 0; this.burrowCooldown = 0; this.stepCount = 0; this.portalCooldown = 0;
       this.haloCharges = 0;
       this.particles = []; this.floatTexts = []; this.shakeMag = 0; this.portalTrail = null;
       this.died = false; this.newBest = false; this.deathExplosionPending = false;
@@ -219,7 +219,7 @@ export function createEngine() {
       this.crown = null;
       this.crownApplesEaten = 0; this.crownFreezeTicks = 0; this.crownUpgradeStartTime = -1;
       this.haloSaveAnim = null;
-      this.phaseTicks = 0; this.phaseCooldown = 0; this.stepCount = 0; this.portalCooldown = 0;
+      this.burrowTicks = 0; this.burrowCooldown = 0; this.stepCount = 0; this.portalCooldown = 0;
       this.haloCharges = 0;
       this.particles = []; this.floatTexts = []; this.shakeMag = 0; this.portalTrail = null;
       this.died = false; this.newBest = false; this.deathExplosionPending = false;
@@ -277,10 +277,10 @@ export function createEngine() {
       }
     },
 
-    activateTunnel() {
-      if (this.phaseCooldown === 0 && this.phaseTicks === 0) {
-        this.phaseTicks = 10;
-        this.phaseCooldown = 20;
+    activateBurrow() {
+      if (this.burrowCooldown === 0 && this.burrowTicks === 0) {
+        this.burrowTicks = 10;
+        this.burrowCooldown = 20;
         sndTunnelActivate();
         return true;
       }
@@ -466,10 +466,10 @@ export function createEngine() {
       if (this.inputQ.length) this.dir = this.inputQ.shift();
 
       let head = { x: this.snake[0].x + this.dir.x, y: this.snake[0].y + this.dir.y };
-      let phasing = (this.phaseTicks > 0);
+      let burrowing = (this.burrowTicks > 0);
 
       let wrapped = false;
-      if (phasing) {
+      if (burrowing) {
         const wx = ((head.x % COLS) + COLS) % COLS;
         const wy = ((head.y % ROWS) + ROWS) % ROWS;
         if (wx !== head.x || wy !== head.y) wrapped = true;
@@ -482,7 +482,7 @@ export function createEngine() {
         const hitB = head.x === pp.b.x && head.y === pp.b.y;
         if (hitA || hitB) {
           const from = hitA ? pp.a : pp.b, to = hitA ? pp.b : pp.a;
-          const hCol = this.phaseTicks > 0 ? C.PHASE_HEAD : C.HEAD;
+          const hCol = this.burrowTicks > 0 ? C.BURROW_HEAD : C.HEAD;
           head = { ...to }; this.portalCooldown = 1; sndPortal();
           this.shakeMag = Math.max(this.shakeMag, 4); // portal shake
           // Stagger particle trail over the cooldown period
@@ -497,7 +497,7 @@ export function createEngine() {
 
       // Death check
       let dead = false;
-      if (!phasing) {
+      if (!burrowing) {
         dead = head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS;
         if (!dead) for (let i = 0; i < this.snake.length - 1; i++)
           if (!this.snakeGhost[i] && this.snake[i].x === head.x && this.snake[i].y === head.y) { dead = true; break; }
@@ -510,7 +510,7 @@ export function createEngine() {
 
       // Halo save
       if (dead && this.haloCharges > 0) {
-        this.haloCharges--; this.phaseTicks = 10; phasing = true;
+        this.haloCharges--; this.burrowTicks = 10; burrowing = true;
         head.x = ((head.x % COLS) + COLS) % COLS;
         head.y = ((head.y % ROWS) + ROWS) % ROWS;
         dead = false;
@@ -590,7 +590,7 @@ export function createEngine() {
       }
 
       const ate = this.food && head.x === this.food.x && head.y === this.food.y;
-      this.snake.unshift(head); this.snakeGhost.unshift(phasing); this.snakeDir.unshift({ ...this.dir });
+      this.snake.unshift(head); this.snakeGhost.unshift(burrowing); this.snakeDir.unshift({ ...this.dir });
 
       if (ate) {
         this.foodExplosion(this.food.x, this.food.y);
@@ -606,7 +606,7 @@ export function createEngine() {
         }
         this.tickRate = Math.max(0.066, this.tickRate - 0.0008);
         this.tick = -this.tickRate * 0.5; // half-step pause after eating
-        if (phasing) { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
+        if (burrowing) { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
 
         // Every third apple while crowned adds another crown
         if (this.crown) {
@@ -626,8 +626,8 @@ export function createEngine() {
         }
       } else { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
 
-      if (this.phaseTicks > 0) this.phaseTicks--;
-      if (this.phaseCooldown > 0) this.phaseCooldown--;
+      if (this.burrowTicks > 0) this.burrowTicks--;
+      if (this.burrowCooldown > 0) this.burrowCooldown--;
       this.stepCount++;
 
       // Record replay frame each tick

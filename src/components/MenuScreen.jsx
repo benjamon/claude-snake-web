@@ -5,7 +5,7 @@ import { setSfxMuted, setMusicMuted, isSfxMuted, isMusicMuted } from '../game/au
 
 export default function MenuScreen({
   playerName, personalBest, palIdx, leaderboard,
-  onPlay, onRename, onPaletteChange, onHelp, onTutorial,
+  onPlay, onRename, onPaletteChange, onTutorial,
 }) {
   const [editing, setEditing] = useState(false);
   const [nameBuf, setNameBuf] = useState(playerName);
@@ -102,7 +102,6 @@ export default function MenuScreen({
         <div className="btn-row">
           <button className="btn btn--secondary" onClick={startEdit}>Rename</button>
           <button className="btn btn--secondary" onClick={onTutorial}>Tutorial</button>
-          <button className="btn btn--secondary" onClick={onHelp}>Help</button>
         </div>
 
         <div className="btn-row">

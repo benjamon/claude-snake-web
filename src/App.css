@@ -3,7 +3,6 @@
   --color-head: rgb(110, 235, 110);
   --color-dim: rgb(150, 150, 150);
   --color-food: rgb(230, 75, 75);
-  --color-phase: rgb(120, 210, 255);
   --color-gold: #ffdd44;
   --color-panel: rgba(12, 12, 18, 0.96);
   --color-panel-border: rgba(80, 80, 120, 0.8);
@@ -399,7 +398,6 @@ html, body, #root {
   margin-bottom: 2px;
 }
 
-.indicator-label--tunnel { color: rgba(160, 220, 255, 0.7); }
 .indicator-label--halo { color: rgba(255, 220, 80, 0.7); }
 
 .charge-icon {
@@ -411,41 +409,9 @@ html, body, #root {
   justify-content: center;
 }
 
-.charge-icon--tunnel {
-  background: rgba(24, 42, 51, 0.9);
-  border: 2px solid rgba(120, 210, 255, 0.8);
-  border-radius: 50%;
-}
-
-.charge-icon--tunnel-active {
-  background: rgba(24, 42, 51, 0.9);
-  border: 2px solid rgba(120, 210, 255, 1);
-  border-radius: 50%;
-  box-shadow: 0 0 6px rgba(120, 210, 255, 0.6);
-  animation: pulse-glow 0.4s ease-in-out infinite alternate;
-}
-
-.charge-icon--tunnel-cooldown {
-  background: rgba(14, 22, 28, 0.9);
-  border-color: rgba(120, 210, 255, 0.35);
-}
-
-.charge-icon__count {
-  color: rgba(200, 230, 255, 0.9);
-  font-family: var(--font);
-  font-size: clamp(0.55rem, 1.4vw, 0.8rem);
-  font-weight: 700;
-  line-height: 1;
-}
-
 .charge-icon--halo {
   border: 2px solid rgba(255, 210, 40, 0.75);
   border-radius: 50%;
-}
-
-@keyframes pulse-glow {
-  from { opacity: 0.7; }
-  to { opacity: 1; }
 }
 
 /* ============================================ */
@@ -798,7 +764,7 @@ html, body, #root {
   height: 1px;
 }
 
-.touch-tunnel-btn {
+.touch-burrow-btn {
   pointer-events: auto;
   width: clamp(88px, 22vw, 120px);
   height: clamp(88px, 22vw, 120px);
@@ -816,25 +782,25 @@ html, body, #root {
   user-select: none;
 }
 
-.touch-tunnel-btn:active {
+.touch-burrow-btn:active {
   background: rgba(55, 155, 205, 0.35);
   border-color: rgba(160, 220, 255, 0.7);
   color: rgba(200, 235, 255, 0.95);
 }
 
-.touch-tunnel-btn--disabled {
+.touch-burrow-btn--disabled {
   background: rgba(80, 80, 80, 0.12);
   border-color: rgba(120, 120, 120, 0.25);
   color: rgba(120, 120, 120, 0.35);
 }
 
-.touch-tunnel-btn--disabled:active {
+.touch-burrow-btn--disabled:active {
   background: rgba(80, 80, 80, 0.12);
   border-color: rgba(120, 120, 120, 0.25);
   color: rgba(120, 120, 120, 0.35);
 }
 
-.touch-tunnel-btn--highlight {
+.touch-burrow-btn--highlight {
   background: rgba(100, 210, 255, 0.35);
   border-color: rgba(200, 240, 255, 0.95);
   color: rgba(230, 250, 255, 1);

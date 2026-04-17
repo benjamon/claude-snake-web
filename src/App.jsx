@@ -12,7 +12,6 @@ import SetupScreen from './components/SetupScreen.jsx';
 import MenuScreen from './components/MenuScreen.jsx';
 import DeadScreen from './components/DeadScreen.jsx';
 import PaletteEditor from './components/PaletteEditor.jsx';
-import HelpScreen from './components/HelpScreen.jsx';
 import SideIndicators from './components/SideIndicators.jsx';
 import TouchControls from './components/TouchControls.jsx';
 import TutorialScreen from './components/TutorialScreen.jsx';
@@ -25,10 +24,10 @@ const isTouchDevice = () =>
 const TUT_MSG = (isTouch) => [
   isTouch ? 'Touch or swipe to move.' : 'WASD or arrow keys to move.',
   isTouch
-    ? 'Phasing lets you burrow under obstacles and wrap the screen. Tap the glowing PHASE button.'
-    : 'Phasing lets you burrow under obstacles and wrap the screen. Press SPACE to phase.',
+    ? 'Burrowing lets you tunnel under obstacles and wrap the screen. Tap the glowing BURROW button.'
+    : 'Burrowing lets you tunnel under obstacles and wrap the screen. Press SPACE to burrow.',
   'Portals let you teleport across the map.',
-  'Halos make you phase when you would die.',
+  'Halos make you burrow when you would die.',
   'The crown gives you points \u2014 don\u2019t break it!',
 ];
 
@@ -85,7 +84,6 @@ export default function App() {
   const [state, setState] = useState(player.current.name ? S.MENU : S.SETUP);
   const [palIdx, setPalIdx] = useState(0);
   const [showPalette, setShowPalette] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const [, tick] = useState(0); // force re-render for HUD updates
 
   const engineRef = useRef(createEngine());
@@ -215,7 +213,7 @@ export default function App() {
           e.preventDefault();
         }
         if (e.code === 'Space') {
-          engine.activateTunnel();
+          engine.activateBurrow();
           e.preventDefault();
         }
         if (e.code === 'Escape') {
@@ -326,8 +324,8 @@ export default function App() {
     engineRef.current.queueDirection(d);
   }, []);
 
-  const handleTunnel = useCallback(() => {
-    engineRef.current.activateTunnel();
+  const handleBurrow = useCallback(() => {
+    engineRef.current.activateBurrow();
   }, []);
 
   const engine = engineRef.current;
@@ -346,8 +344,6 @@ export default function App() {
         {/* Side indicators during play */}
         {(state === S.PLAY || state === S.DEAD || state === S.TUTORIAL) && (
           <SideIndicators
-            phaseCooldown={engine.phaseCooldown}
-            phaseTicks={engine.phaseTicks}
             haloCharges={engine.haloCharges}
             layout={boardLayout}
           />
@@ -357,10 +353,10 @@ export default function App() {
         {(state === S.PLAY || state === S.TUTORIAL) && (
           <TouchControls
             onDirection={handleSwipe}
-            onTunnel={handleTunnel}
-            phaseCooldown={engine.phaseCooldown}
-            phaseTicks={engine.phaseTicks}
-            highlightTunnel={state === S.TUTORIAL && tutStage === 1}
+            onBurrow={handleBurrow}
+            burrowCooldown={engine.burrowCooldown}
+            burrowTicks={engine.burrowTicks}
+            highlightBurrow={state === S.TUTORIAL && tutStage === 1}
           />
         )}
 
@@ -384,7 +380,7 @@ export default function App() {
           <SetupScreen onContinue={handleSetupContinue} initialName={playerName} />
         )}
 
-        {state === S.MENU && !showPalette && !showHelp && (
+        {state === S.MENU && !showPalette && (
           <MenuScreen
             playerName={playerName}
             personalBest={personalBest}
@@ -393,13 +389,8 @@ export default function App() {
             onPlay={startGame}
             onRename={handleRename}
             onPaletteChange={changePalette}
-            onHelp={() => setShowHelp(true)}
             onTutorial={startTutorial}
           />
-        )}
-
-        {showHelp && (
-          <HelpScreen onBack={() => setShowHelp(false)} />
         )}
 
         {state === S.DEAD && (

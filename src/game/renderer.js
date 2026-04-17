@@ -191,13 +191,13 @@ function renderSnapshot(ctx, frame, layout, alpha, replayTime) {
   }
 
   // Snake body
-  const bCol = frame.phaseTicks > 0 ? C.PHASE_BODY : C.BODY;
+  const bCol = frame.burrowTicks > 0 ? C.BURROW_BODY : C.BODY;
   const edgeW = Math.max(1, Math.round(gCell * 0.12));
   const fadeStart = frame.snake.length - Math.max(1, (frame.snake.length * 0.3) | 0);
   for (let i = frame.snake.length - 1; i >= 1; i--) {
     if (!frame.snakeGhost[i]) {
       let a = i >= fadeStart ? 0.55 + (1 - 0.55) * (1 - (i - fadeStart) / (frame.snake.length - fadeStart)) : 1.0;
-      if (frame.phaseTicks > 0) a = Math.min(a, 0.78);
+      if (frame.burrowTicks > 0) a = Math.min(a, 0.78);
       const sx = frame.snake[i].x * gCell + 2, sy = frame.snake[i].y * gCell + 2;
       const sw = gCell - 4, sh = gCell - 4;
       ctx.fillStyle = rgbA(bCol, a);
@@ -234,7 +234,7 @@ function renderSnapshot(ctx, frame, layout, alpha, replayTime) {
   }
 
   // Head
-  const hCol = frame.phaseTicks > 0 ? C.PHASE_HEAD : C.HEAD;
+  const hCol = frame.burrowTicks > 0 ? C.BURROW_HEAD : C.HEAD;
   ctx.fillStyle = rgbA(hCol);
   ctx.fillRect(frame.snake[0].x * gCell + 1, frame.snake[0].y * gCell + 1, gCell - 2, gCell - 2);
 
@@ -554,13 +554,13 @@ export function renderGame(ctx, engine, layout) {
   }
 
   // Snake body
-  const bCol = engine.phaseTicks > 0 ? C.PHASE_BODY : C.BODY;
+  const bCol = engine.burrowTicks > 0 ? C.BURROW_BODY : C.BODY;
   const edgeW = Math.max(1, Math.round(gCell * 0.12));
   const fadeStart = engine.snake.length - Math.max(1, (engine.snake.length * 0.3) | 0);
   for (let i = engine.snake.length - 1; i >= 1; i--) {
     if (!engine.snakeGhost[i]) {
       let a = i >= fadeStart ? 0.55 + (1 - 0.55) * (1 - (i - fadeStart) / (engine.snake.length - fadeStart)) : 1.0;
-      if (engine.phaseTicks > 0) a = Math.min(a, 0.78);
+      if (engine.burrowTicks > 0) a = Math.min(a, 0.78);
       const sx = engine.snake[i].x * gCell + 2, sy = engine.snake[i].y * gCell + 2;
       const sw = gCell - 4, sh = gCell - 4;
       ctx.fillStyle = rgbA(bCol, a);
@@ -602,7 +602,7 @@ export function renderGame(ctx, engine, layout) {
   }
 
   // Head
-  const hCol = engine.phaseTicks > 0 ? C.PHASE_HEAD : C.HEAD;
+  const hCol = engine.burrowTicks > 0 ? C.BURROW_HEAD : C.HEAD;
   ctx.fillStyle = rgbA(hCol);
   ctx.fillRect(engine.snake[0].x * gCell + 1, engine.snake[0].y * gCell + 1, gCell - 2, gCell - 2);
 
