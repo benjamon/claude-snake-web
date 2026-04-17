@@ -169,6 +169,13 @@ export default function App() {
     engineRef.current.reset();
     setState(S.PLAY);
     startBgMusic();
+    // Mobile: enter fullscreen so the browser chrome doesn't eat screen space
+    const isMobile = window.matchMedia('(pointer: coarse)').matches;
+    if (isMobile && !document.fullscreenElement) {
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (req) Promise.resolve(req.call(el)).catch(() => {});
+    }
   }, []);
 
   const changePalette = useCallback((dir) => {
