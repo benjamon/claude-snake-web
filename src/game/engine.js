@@ -482,8 +482,8 @@ export function createEngine() {
           const mult = this.crown;
           const pts = base * mult;
           this.score += pts;
-          const label = mult > 1 ? `+${base} x ${mult}` : `+${base}`;
-          this.floatText(head.x, head.y, label, [255, 215, 0], 1.25 + 0.5 * (mult - 1), -8);
+          const label = mult > 1 ? `+${base}(x${mult})` : `+${base}`;
+          this.floatText(head.x, head.y, label, [255, 215, 0], 1.25, -8);
           this.burst(head.x, head.y, 14, 30, 130, 3, 8, 0.3, 0.7, [[255, 215, 0], [255, 255, 150], [200, 160, 0]]);
           this.shakeMag = Math.max(this.shakeMag, 5);
           this.crownPickups.splice(i, 1); sndHaloPickup(); break;
@@ -511,8 +511,8 @@ export function createEngine() {
           const mult = this.crown;
           const pts = base * mult;
           this.score += pts;
-          const label = mult > 1 ? `+${base} x ${mult}` : `+${base}`;
-          this.floatText(crownCell.x, crownCell.y, label, [255, 215, 0], 0.8 + 0.5 * (mult - 1), -6);
+          const label = mult > 1 ? `+${base}(x${mult})` : `+${base}`;
+          this.floatText(crownCell.x, crownCell.y, label, [255, 215, 0], 0.8, -6);
         }
       }
 
@@ -540,8 +540,8 @@ export function createEngine() {
             this.burstLong(crownCell.x, crownCell.y, 30, 20, 120, 3, 8,
               [[255, 215, 0], [255, 235, 120], [255, 255, 200], [220, 170, 20]]);
             this.shakeMag = Math.max(this.shakeMag, 8);
-            this.floatText(crownCell.x, crownCell.y, `x${this.crown}`,
-              [255, 215, 0], 1.5 + 0.5 * (this.crown - 1), -10);
+            this.floatText(crownCell.x, crownCell.y, `(x${this.crown})`,
+              [255, 215, 0], 1.5, -10);
             sndHaloPickup();
           }
         }
