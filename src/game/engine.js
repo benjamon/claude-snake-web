@@ -31,7 +31,7 @@ function snap(engine) {
     })),
     crownPickups: engine.crownPickups.map(c => ({ ...c })),
     crown: engine.crown,
-    crownStepsHeld: engine.crownStepsHeld,
+    crownApplesEaten: engine.crownApplesEaten,
     crownFreezeTicks: engine.crownFreezeTicks,
     crownUpgradeStartTime: engine.crownUpgradeStartTime,
     phaseTicks: engine.phaseTicks,
@@ -52,7 +52,7 @@ export function createEngine() {
     deathBlocks: [], deathBlockFlash: [], tunnelPowerups: [], haloPowerups: [],
     wallEvents: [], portalPairs: [], crownPickups: [],
     crown: null, // null = none, 1 = single, 2 = double
-    crownStepsHeld: 0, crownFreezeTicks: 0, crownUpgradeStartTime: -1,
+    crownApplesEaten: 0, crownFreezeTicks: 0, crownUpgradeStartTime: -1,
     phaseTicks: 0, stepCount: 0, portalCooldown: 0,
     tunnelCharges: 0, haloCharges: 0,
     // FX
@@ -185,7 +185,7 @@ export function createEngine() {
       this.deathBlocks = []; this.deathBlockFlash = []; this.tunnelPowerups = []; this.haloPowerups = [];
       this.wallEvents = []; this.portalPairs = []; this.crownPickups = [];
       this.crown = null;
-      this.crownStepsHeld = 0; this.crownFreezeTicks = 0; this.crownUpgradeStartTime = -1;
+      this.crownApplesEaten = 0; this.crownFreezeTicks = 0; this.crownUpgradeStartTime = -1;
       this.phaseTicks = 0; this.stepCount = 0; this.portalCooldown = 0;
       this.tunnelCharges = 0; this.haloCharges = 0;
       this.particles = []; this.floatTexts = []; this.shakeMag = 0; this.portalTrail = null;
@@ -234,6 +234,23 @@ export function createEngine() {
           vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
           sz: (szMin + Math.random() * (szMax - szMin)) * SZ,
           li: 1.5, liMax: 1.5, col
+        });
+      }
+    },
+
+    // Long-lived particle burst (3x normal lifetime) — used for crown upgrades
+    burstLong(cellX, cellY, count, spMin, spMax, szMin, szMax, colors) {
+      const SP = 0.25, SZ = 2.0;
+      const life = 4.5;
+      for (let i = 0; i < count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const sp = (spMin + Math.random() * (spMax - spMin)) * SP;
+        const col = colors[Math.floor(Math.random() * colors.length)];
+        this.particles.push({
+          x: cellX, y: cellY,
+          vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+          sz: (szMin + Math.random() * (szMax - szMin)) * SZ,
+          li: life, liMax: life, col
         });
       }
     },
@@ -460,17 +477,19 @@ export function createEngine() {
       // Collect crown pickups
       for (let i = this.crownPickups.length - 1; i >= 0; i--)
         if (this.crownPickups[i].x === head.x && this.crownPickups[i].y === head.y) {
-          if (!this.crown) { this.crown = 1; this.crownStepsHeld = 0; }
+          if (!this.crown) { this.crown = 1; this.crownApplesEaten = 0; }
           const base = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
-          const pts = base * this.crown;
+          const mult = this.crown;
+          const pts = base * mult;
           this.score += pts;
-          this.floatText(head.x, head.y, `+${pts}`, [255, 215, 0], 1.25, -8);
+          const label = mult > 1 ? `+${base} x ${mult}` : `+${base}`;
+          this.floatText(head.x, head.y, label, [255, 215, 0], 1.25 + 0.5 * (mult - 1), -8);
           this.burst(head.x, head.y, 14, 30, 130, 3, 8, 0.3, 0.7, [[255, 215, 0], [255, 255, 150], [200, 160, 0]]);
           this.shakeMag = Math.max(this.shakeMag, 5);
           this.crownPickups.splice(i, 1); sndHaloPickup(); break;
         }
 
-      // Crown: award points and check if destroyed
+      // Crown: award periodic points and check if destroyed
       if (this.crown) {
         const crownCell = { x: head.x + this.dir.y, y: head.y - this.dir.x };
         let crownDead = wrapped;
@@ -482,29 +501,18 @@ export function createEngine() {
             if (c.x === crownCell.x && c.y === crownCell.y) { crownDead = true; break; }
         if (crownDead) {
           this.crown = null;
-          this.crownStepsHeld = 0;
+          this.crownApplesEaten = 0;
           const oob = wrapped || crownCell.x < 0 || crownCell.x >= COLS || crownCell.y < 0 || crownCell.y >= ROWS;
           this.burst(oob ? head.x : crownCell.x, oob ? head.y : crownCell.y,
             16, 20, 80, 2, 5, 0.2, 0.5, [[255, 215, 0], [200, 160, 0]]);
           sndCrownShatter();
-        } else {
-          this.crownStepsHeld++;
-          if (this.crown === 1 && this.crownStepsHeld >= 30) {
-            this.crown = 2;
-            this.crownFreezeTicks = 3;
-            this.crownUpgradeStartTime = this.gTime;
-            this.burst(crownCell.x, crownCell.y, 24, 30, 140, 3, 8, 0.4, 0.8,
-              [[255, 215, 0], [255, 255, 180], [255, 160, 40]]);
-            this.shakeMag = Math.max(this.shakeMag, 8);
-            this.floatText(crownCell.x, crownCell.y, 'x2', [255, 215, 0], 1.5, -10);
-            sndHaloPickup();
-          }
-          if (this.stepCount % 6 === 0) {
-            const base = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
-            const pts = base * this.crown;
-            this.score += pts;
-            this.floatText(crownCell.x, crownCell.y, `+${pts}`, [255, 215, 0], 0.8, -6);
-          }
+        } else if (this.stepCount % 6 === 0) {
+          const base = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
+          const mult = this.crown;
+          const pts = base * mult;
+          this.score += pts;
+          const label = mult > 1 ? `+${base} x ${mult}` : `+${base}`;
+          this.floatText(crownCell.x, crownCell.y, label, [255, 215, 0], 0.8 + 0.5 * (mult - 1), -6);
         }
       }
 
@@ -520,6 +528,23 @@ export function createEngine() {
         this.tickRate = Math.max(0.066, this.tickRate - 0.0008);
         this.tick = -this.tickRate * 0.5; // half-step pause after eating
         if (phasing) { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
+
+        // Every third apple while crowned adds another crown
+        if (this.crown) {
+          this.crownApplesEaten++;
+          if (this.crownApplesEaten % 3 === 0) {
+            this.crown++;
+            this.crownFreezeTicks = 3;
+            this.crownUpgradeStartTime = this.gTime;
+            const crownCell = { x: head.x + this.dir.y, y: head.y - this.dir.x };
+            this.burstLong(crownCell.x, crownCell.y, 30, 20, 120, 3, 8,
+              [[255, 215, 0], [255, 235, 120], [255, 255, 200], [220, 170, 20]]);
+            this.shakeMag = Math.max(this.shakeMag, 8);
+            this.floatText(crownCell.x, crownCell.y, `x${this.crown}`,
+              [255, 215, 0], 1.5 + 0.5 * (this.crown - 1), -10);
+            sndHaloPickup();
+          }
+        }
       } else { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
 
       if (this.phaseTicks > 0) this.phaseTicks--;

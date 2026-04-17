@@ -288,20 +288,25 @@ function renderSnapshot(ctx, frame, layout, alpha, replayTime) {
       ctx.save();
       ctx.translate(ccx, ccy);
       ctx.rotate(angle);
-      drawCrown(1);
-      if (frame.crown === 2) {
-        const animDur = 0.6;
-        const elapsed = (frame.gTime || 0) - (frame.crownUpgradeStartTime || 0);
-        let scale = 1;
-        if (elapsed < animDur) {
+      const N = frame.crown;
+      const animDur = 0.6;
+      const elapsed = (frame.gTime || 0) - (frame.crownUpgradeStartTime || 0);
+      let offsetY = 0;
+      for (let k = 0; k < N; k++) {
+        const isTop = (k === N - 1);
+        const baseScale = Math.pow(0.8, k);
+        let animScale = 1;
+        if (k >= 1 && isTop && elapsed < animDur) {
           const t = Math.max(0, elapsed) / animDur;
-          scale = t < 0.7 ? (t / 0.7) * 1.3 : 1.3 - ((t - 0.7) / 0.3) * 0.3;
+          animScale = t < 0.7 ? (t / 0.7) * 1.3 : 1.3 - ((t - 0.7) / 0.3) * 0.3;
         }
+        const scale = baseScale * animScale;
         ctx.save();
-        ctx.translate(0, -csz * 0.85);
-        ctx.scale(scale * 0.8, scale * 0.8);
-        drawCrown(Math.min(1, scale));
+        ctx.translate(0, offsetY);
+        ctx.scale(scale, scale);
+        drawCrown(Math.min(1, animScale));
         ctx.restore();
+        offsetY -= 0.85 * csz * scale;
       }
       ctx.restore();
     }
@@ -652,21 +657,25 @@ export function renderGame(ctx, engine, layout) {
       ctx.save();
       ctx.translate(ccx, ccy);
       ctx.rotate(angle);
-      drawCrown(1);
-      if (engine.crown === 2) {
-        // Second crown stacked on top; bouncy scale-in on upgrade
-        const animDur = 0.6;
-        const elapsed = engine.gTime - (engine.crownUpgradeStartTime || 0);
-        let scale = 1;
-        if (elapsed < animDur) {
+      const N = engine.crown;
+      const animDur = 0.6;
+      const elapsed = engine.gTime - (engine.crownUpgradeStartTime || 0);
+      let offsetY = 0;
+      for (let k = 0; k < N; k++) {
+        const isTop = (k === N - 1);
+        const baseScale = Math.pow(0.8, k);
+        let animScale = 1;
+        if (k >= 1 && isTop && elapsed < animDur) {
           const t = Math.max(0, elapsed) / animDur;
-          scale = t < 0.7 ? (t / 0.7) * 1.3 : 1.3 - ((t - 0.7) / 0.3) * 0.3;
+          animScale = t < 0.7 ? (t / 0.7) * 1.3 : 1.3 - ((t - 0.7) / 0.3) * 0.3;
         }
+        const scale = baseScale * animScale;
         ctx.save();
-        ctx.translate(0, -csz * 0.85);
-        ctx.scale(scale * 0.8, scale * 0.8);
-        drawCrown(Math.min(1, scale));
+        ctx.translate(0, offsetY);
+        ctx.scale(scale, scale);
+        drawCrown(Math.min(1, animScale));
         ctx.restore();
+        offsetY -= 0.85 * csz * scale;
       }
       ctx.restore();
     }
