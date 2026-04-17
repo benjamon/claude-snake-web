@@ -102,7 +102,7 @@ export default function App() {
 
   // Tutorial state
   const [tutStage, setTutStage] = useState(0);
-  const [tutShowNext, setTutShowNext] = useState(false);
+  const [tutDelayPassed, setTutDelayPassed] = useState(false);
   const [tutStage4Eaten, setTutStage4Eaten] = useState(false);
   const isTouchRef = useRef(isTouchDevice());
 
@@ -162,34 +162,25 @@ export default function App() {
         e.tutorialRestartPending = false;
         applyTutorialStage(e, tutStage);
         setTutStage4Eaten(false);
-        if (tutStage === 4) setTutShowNext(false);
       }
       if (tutStage === 4 && e.tutorialAppleEaten && !tutStage4Eaten) {
         e.tutorialAppleEaten = false;
         setTutStage4Eaten(true);
         applyStage4Post(e);
-        setTutShowNext(true);
       }
     }, 50);
     return () => clearInterval(id);
   }, [state, tutStage, tutStage4Eaten]);
 
-  // Tutorial: when stage changes, apply config + schedule "Next" visibility
+  // Tutorial: each stage starts with a 3-second lockout before Next appears
   useEffect(() => {
     if (state !== S.TUTORIAL) return;
     const e = engineRef.current;
     applyTutorialStage(e, tutStage);
     setTutStage4Eaten(false);
-    setTutShowNext(false);
-    if (tutStage === 0) {
-      const t = setTimeout(() => setTutShowNext(true), 2000);
-      return () => clearTimeout(t);
-    }
-    if (tutStage === 4) {
-      // Wait for apple eaten — polling effect handles setTutShowNext
-      return;
-    }
-    setTutShowNext(true);
+    setTutDelayPassed(false);
+    const t = setTimeout(() => setTutDelayPassed(true), 3000);
+    return () => clearTimeout(t);
   }, [state, tutStage]);
 
   // Mobile: pause music when backgrounded, resume when refocused
@@ -266,19 +257,20 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [state]);
 
+  const requestMobileFullscreen = useCallback(() => {
+    if (!isTouchRef.current || document.fullscreenElement) return;
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) Promise.resolve(req.call(el)).catch(() => {});
+  }, []);
+
   const startGame = useCallback(() => {
     ensureAudio();
     engineRef.current.reset();
     setState(S.PLAY);
     startBgMusic();
-    // Mobile: enter fullscreen so the browser chrome doesn't eat screen space
-    const isMobile = window.matchMedia('(pointer: coarse)').matches;
-    if (isMobile && !document.fullscreenElement) {
-      const el = document.documentElement;
-      const req = el.requestFullscreen || el.webkitRequestFullscreen;
-      if (req) Promise.resolve(req.call(el)).catch(() => {});
-    }
-  }, []);
+    requestMobileFullscreen();
+  }, [requestMobileFullscreen]);
 
   const startTutorial = useCallback(() => {
     ensureAudio();
@@ -286,9 +278,10 @@ export default function App() {
     setTutStage(0);
     applyTutorialStage(engineRef.current, 0);
     setTutStage4Eaten(false);
-    setTutShowNext(false);
+    setTutDelayPassed(false);
     setState(S.TUTORIAL);
-  }, []);
+    requestMobileFullscreen();
+  }, [requestMobileFullscreen]);
 
   const finishTutorial = useCallback(() => {
     engineRef.current.tutorialMode = false;
@@ -378,7 +371,7 @@ export default function App() {
                 ? 'Eat the apple to continue.'
                 : TUT_MSG(isTouchRef.current)[tutStage]
             }
-            showNext={tutShowNext}
+            showNext={tutDelayPassed && (tutStage !== 4 || tutStage4Eaten)}
             nextLabel={tutStage === 4 ? 'Finish Tutorial \u25B6' : 'Next \u25B6'}
             onNext={advanceTutorial}
             onSkip={skipTutorial}
