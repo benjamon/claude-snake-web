@@ -275,17 +275,34 @@ function renderSnapshot(ctx, frame, layout, alpha, replayTime) {
       const csz = gCell * 0.36;
       const cpulse = (Math.sin(gt * 4) + 1) * 0.5;
       const angle = Math.atan2(frame.dir.y, frame.dir.x);
+      const drawCrown = (a) => {
+        ctx.fillStyle = `rgba(255,215,0,${(0.9 + cpulse * 0.1) * a})`;
+        ctx.beginPath();
+        ctx.moveTo(-csz, csz * 0.5); ctx.lineTo(-csz, -csz * 0.2);
+        ctx.lineTo(-csz * 0.5, csz * 0.15); ctx.lineTo(0, -csz * 0.7);
+        ctx.lineTo(csz * 0.5, csz * 0.15); ctx.lineTo(csz, -csz * 0.2);
+        ctx.lineTo(csz, csz * 0.5); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = `rgba(255,50,50,${(0.85 + cpulse * 0.15) * a})`;
+        ctx.beginPath(); ctx.arc(0, csz * 0.1, csz * 0.15, 0, Math.PI * 2); ctx.fill();
+      };
       ctx.save();
       ctx.translate(ccx, ccy);
       ctx.rotate(angle);
-      ctx.fillStyle = `rgba(255,215,0,${0.9 + cpulse * 0.1})`;
-      ctx.beginPath();
-      ctx.moveTo(-csz, csz * 0.5); ctx.lineTo(-csz, -csz * 0.2);
-      ctx.lineTo(-csz * 0.5, csz * 0.15); ctx.lineTo(0, -csz * 0.7);
-      ctx.lineTo(csz * 0.5, csz * 0.15); ctx.lineTo(csz, -csz * 0.2);
-      ctx.lineTo(csz, csz * 0.5); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = `rgba(255,50,50,${0.85 + cpulse * 0.15})`;
-      ctx.beginPath(); ctx.arc(0, csz * 0.1, csz * 0.15, 0, Math.PI * 2); ctx.fill();
+      drawCrown(1);
+      if (frame.crown === 2) {
+        const animDur = 0.6;
+        const elapsed = (frame.gTime || 0) - (frame.crownUpgradeStartTime || 0);
+        let scale = 1;
+        if (elapsed < animDur) {
+          const t = Math.max(0, elapsed) / animDur;
+          scale = t < 0.7 ? (t / 0.7) * 1.3 : 1.3 - ((t - 0.7) / 0.3) * 0.3;
+        }
+        ctx.save();
+        ctx.translate(0, -csz * 0.85);
+        ctx.scale(scale * 0.8, scale * 0.8);
+        drawCrown(Math.min(1, scale));
+        ctx.restore();
+      }
       ctx.restore();
     }
   }
@@ -616,24 +633,41 @@ export function renderGame(ctx, engine, layout) {
       const csz = gCell * 0.36;
       const cpulse = (Math.sin(engine.gTime * 4) + 1) * 0.5;
       // Rotation: crown points "up" by default; rotate so points face toward head
-      // Direction from crown to head is (-dir.y, dir.x)
       const angle = Math.atan2(engine.dir.y, engine.dir.x);
+      const drawCrown = (a) => {
+        ctx.fillStyle = `rgba(255,215,0,${(0.9 + cpulse * 0.1) * a})`;
+        ctx.beginPath();
+        ctx.moveTo(-csz, csz * 0.5);
+        ctx.lineTo(-csz, -csz * 0.2);
+        ctx.lineTo(-csz * 0.5, csz * 0.15);
+        ctx.lineTo(0, -csz * 0.7);
+        ctx.lineTo(csz * 0.5, csz * 0.15);
+        ctx.lineTo(csz, -csz * 0.2);
+        ctx.lineTo(csz, csz * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,50,50,${(0.85 + cpulse * 0.15) * a})`;
+        ctx.beginPath(); ctx.arc(0, csz * 0.1, csz * 0.15, 0, Math.PI * 2); ctx.fill();
+      };
       ctx.save();
       ctx.translate(ccx, ccy);
       ctx.rotate(angle);
-      ctx.fillStyle = `rgba(255,215,0,${0.9 + cpulse * 0.1})`;
-      ctx.beginPath();
-      ctx.moveTo(-csz, csz * 0.5);
-      ctx.lineTo(-csz, -csz * 0.2);
-      ctx.lineTo(-csz * 0.5, csz * 0.15);
-      ctx.lineTo(0, -csz * 0.7);
-      ctx.lineTo(csz * 0.5, csz * 0.15);
-      ctx.lineTo(csz, -csz * 0.2);
-      ctx.lineTo(csz, csz * 0.5);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = `rgba(255,50,50,${0.85 + cpulse * 0.15})`;
-      ctx.beginPath(); ctx.arc(0, csz * 0.1, csz * 0.15, 0, Math.PI * 2); ctx.fill();
+      drawCrown(1);
+      if (engine.crown === 2) {
+        // Second crown stacked on top; bouncy scale-in on upgrade
+        const animDur = 0.6;
+        const elapsed = engine.gTime - (engine.crownUpgradeStartTime || 0);
+        let scale = 1;
+        if (elapsed < animDur) {
+          const t = Math.max(0, elapsed) / animDur;
+          scale = t < 0.7 ? (t / 0.7) * 1.3 : 1.3 - ((t - 0.7) / 0.3) * 0.3;
+        }
+        ctx.save();
+        ctx.translate(0, -csz * 0.85);
+        ctx.scale(scale * 0.8, scale * 0.8);
+        drawCrown(Math.min(1, scale));
+        ctx.restore();
+      }
       ctx.restore();
     }
   }

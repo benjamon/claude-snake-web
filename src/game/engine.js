@@ -31,6 +31,9 @@ function snap(engine) {
     })),
     crownPickups: engine.crownPickups.map(c => ({ ...c })),
     crown: engine.crown,
+    crownStepsHeld: engine.crownStepsHeld,
+    crownFreezeTicks: engine.crownFreezeTicks,
+    crownUpgradeStartTime: engine.crownUpgradeStartTime,
     phaseTicks: engine.phaseTicks,
     score: engine.score,
     stepCount: engine.stepCount,
@@ -48,7 +51,8 @@ export function createEngine() {
     score: 0, tickRate: 0.187, tick: 0, startDelay: 3.0,
     deathBlocks: [], deathBlockFlash: [], tunnelPowerups: [], haloPowerups: [],
     wallEvents: [], portalPairs: [], crownPickups: [],
-    crown: null, // { offset cell relative to head based on dir }
+    crown: null, // null = none, 1 = single, 2 = double
+    crownStepsHeld: 0, crownFreezeTicks: 0, crownUpgradeStartTime: -1,
     phaseTicks: 0, stepCount: 0, portalCooldown: 0,
     tunnelCharges: 0, haloCharges: 0,
     // FX
@@ -181,6 +185,7 @@ export function createEngine() {
       this.deathBlocks = []; this.deathBlockFlash = []; this.tunnelPowerups = []; this.haloPowerups = [];
       this.wallEvents = []; this.portalPairs = []; this.crownPickups = [];
       this.crown = null;
+      this.crownStepsHeld = 0; this.crownFreezeTicks = 0; this.crownUpgradeStartTime = -1;
       this.phaseTicks = 0; this.stepCount = 0; this.portalCooldown = 0;
       this.tunnelCharges = 0; this.haloCharges = 0;
       this.particles = []; this.floatTexts = []; this.shakeMag = 0; this.portalTrail = null;
@@ -366,6 +371,10 @@ export function createEngine() {
       if (this.tick < this.tickRate) return;
       this.tick = 0;
 
+      // Crown upgrade freeze: skip game logic for a few ticks while the
+      // double-crown scaling animation plays
+      if (this.crownFreezeTicks > 0) { this.crownFreezeTicks--; return; }
+
       if (this.inputQ.length) this.dir = this.inputQ.shift();
 
       let head = { x: this.snake[0].x + this.dir.x, y: this.snake[0].y + this.dir.y };
@@ -451,8 +460,9 @@ export function createEngine() {
       // Collect crown pickups
       for (let i = this.crownPickups.length - 1; i >= 0; i--)
         if (this.crownPickups[i].x === head.x && this.crownPickups[i].y === head.y) {
-          this.crown = true;
-          const pts = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
+          if (!this.crown) { this.crown = 1; this.crownStepsHeld = 0; }
+          const base = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
+          const pts = base * this.crown;
           this.score += pts;
           this.floatText(head.x, head.y, `+${pts}`, [255, 215, 0], 1.25, -8);
           this.burst(head.x, head.y, 14, 30, 130, 3, 8, 0.3, 0.7, [[255, 215, 0], [255, 255, 150], [200, 160, 0]]);
@@ -472,14 +482,29 @@ export function createEngine() {
             if (c.x === crownCell.x && c.y === crownCell.y) { crownDead = true; break; }
         if (crownDead) {
           this.crown = null;
+          this.crownStepsHeld = 0;
           const oob = wrapped || crownCell.x < 0 || crownCell.x >= COLS || crownCell.y < 0 || crownCell.y >= ROWS;
           this.burst(oob ? head.x : crownCell.x, oob ? head.y : crownCell.y,
             16, 20, 80, 2, 5, 0.2, 0.5, [[255, 215, 0], [200, 160, 0]]);
           sndCrownShatter();
-        } else if (this.stepCount % 6 === 0) {
-          const pts = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
-          this.score += pts;
-          this.floatText(crownCell.x, crownCell.y, `+${pts}`, [255, 215, 0], 0.8, -6);
+        } else {
+          this.crownStepsHeld++;
+          if (this.crown === 1 && this.crownStepsHeld >= 30) {
+            this.crown = 2;
+            this.crownFreezeTicks = 3;
+            this.crownUpgradeStartTime = this.gTime;
+            this.burst(crownCell.x, crownCell.y, 24, 30, 140, 3, 8, 0.4, 0.8,
+              [[255, 215, 0], [255, 255, 180], [255, 160, 40]]);
+            this.shakeMag = Math.max(this.shakeMag, 8);
+            this.floatText(crownCell.x, crownCell.y, 'x2', [255, 215, 0], 1.5, -10);
+            sndHaloPickup();
+          }
+          if (this.stepCount % 6 === 0) {
+            const base = 1 + (this.stepCount / 240 | 0) + (this.snake.length / 10 | 0);
+            const pts = base * this.crown;
+            this.score += pts;
+            this.floatText(crownCell.x, crownCell.y, `+${pts}`, [255, 215, 0], 0.8, -6);
+          }
         }
       }
 
