@@ -403,9 +403,12 @@ html, body, #root {
 .indicator-label--halo { color: rgba(255, 220, 80, 0.7); }
 
 .charge-icon {
-  width: clamp(12px, 2vw, 20px);
-  height: clamp(12px, 2vw, 20px);
+  width: clamp(14px, 2.6vw, 24px);
+  height: clamp(14px, 2.6vw, 24px);
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .charge-icon--tunnel {
@@ -420,6 +423,19 @@ html, body, #root {
   border-radius: 50%;
   box-shadow: 0 0 6px rgba(120, 210, 255, 0.6);
   animation: pulse-glow 0.4s ease-in-out infinite alternate;
+}
+
+.charge-icon--tunnel-cooldown {
+  background: rgba(14, 22, 28, 0.9);
+  border-color: rgba(120, 210, 255, 0.35);
+}
+
+.charge-icon__count {
+  color: rgba(200, 230, 255, 0.9);
+  font-family: var(--font);
+  font-size: clamp(0.55rem, 1.4vw, 0.8rem);
+  font-weight: 700;
+  line-height: 1;
 }
 
 .charge-icon--halo {

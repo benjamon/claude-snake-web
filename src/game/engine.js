@@ -1,7 +1,7 @@
 import { COLS, ROWS, PORTAL_COLORS, C } from './constants.js';
 import {
   sndEat, sndDie, sndVictory, sndPortal,
-  sndTunnelPickup, sndTunnelActivate, sndTunnelSpawn,
+  sndTunnelActivate,
   sndHaloPickup, sndHaloSave, sndHaloSpawn, sndPortalSpawn,
   sndDeathBlockSpawn, sndWallWarning, sndDeathHit, sndDeathFinale, sndCrownShatter,
 } from './audio.js';
@@ -19,7 +19,6 @@ function snap(engine) {
     foodSpawnTime: engine.foodSpawnTime,
     deathBlocks: engine.deathBlocks.map(b => ({ ...b })),
     deathBlockFlash: [...engine.deathBlockFlash],
-    tunnelPowerups: engine.tunnelPowerups.map(t => ({ ...t })),
     haloPowerups: engine.haloPowerups.map(h => ({ ...h })),
     wallEvents: engine.wallEvents.map(w => ({
       ...w,
@@ -38,7 +37,7 @@ function snap(engine) {
     phaseTicks: engine.phaseTicks,
     score: engine.score,
     stepCount: engine.stepCount,
-    tunnelCharges: engine.tunnelCharges,
+    phaseCooldown: engine.phaseCooldown,
     haloCharges: engine.haloCharges,
     gTime: engine.gTime,
   };
@@ -50,7 +49,7 @@ export function createEngine() {
     snake: [], snakeGhost: [], snakeDir: [], dir: { x: 1, y: 0 }, inputQ: [],
     food: null, foodSpawnTime: 0,
     score: 0, tickRate: 0.187, tick: 0, startDelay: 3.0,
-    deathBlocks: [], deathBlockFlash: [], tunnelPowerups: [], haloPowerups: [],
+    deathBlocks: [], deathBlockFlash: [], haloPowerups: [],
     wallEvents: [], portalPairs: [], crownPickups: [],
     crown: null, // null = none, 1 = single, 2 = double
     crownApplesEaten: 0, crownFreezeTicks: 0, crownUpgradeStartTime: -1,
@@ -58,8 +57,8 @@ export function createEngine() {
     tutorialMode: false,
     tutorialRestartPending: false,
     tutorialAppleEaten: false,
-    phaseTicks: 0, stepCount: 0, portalCooldown: 0,
-    tunnelCharges: 0, haloCharges: 0,
+    phaseTicks: 0, phaseCooldown: 0, stepCount: 0, portalCooldown: 0,
+    haloCharges: 0,
     // FX
     particles: [], floatTexts: [],
     gTime: 0, shakeX: 0, shakeY: 0, shakeMag: 0, deathExplosionPending: false,
@@ -79,7 +78,6 @@ export function createEngine() {
       for (const s of this.snake) if (s.x === c.x && s.y === c.y) return true;
       if (!skipFood && this.food && this.food.x === c.x && this.food.y === c.y) return true;
       for (const b of this.deathBlocks) if (b.x === c.x && b.y === c.y) return true;
-      for (const t of this.tunnelPowerups) if (t.x === c.x && t.y === c.y) return true;
       for (const h of this.haloPowerups) if (h.x === c.x && h.y === c.y) return true;
       for (const pp of this.portalPairs)
         if ((pp.a.x === c.x && pp.a.y === c.y) || (pp.b.x === c.x && pp.b.y === c.y)) return true;
@@ -166,8 +164,6 @@ export function createEngine() {
         if (this.food && this.food.x === c.x && this.food.y === c.y) skip = true;
         for (const pp of this.portalPairs)
           if ((pp.a.x === c.x && pp.a.y === c.y) || (pp.b.x === c.x && pp.b.y === c.y)) { skip = true; break; }
-        for (const t of this.tunnelPowerups)
-          if (t.x === c.x && t.y === c.y) { skip = true; break; }
         for (const h of this.haloPowerups)
           if (h.x === c.x && h.y === c.y) { skip = true; break; }
         if (!skip) cells.push(c);
@@ -187,19 +183,18 @@ export function createEngine() {
       this.snakeDir = [{ x: 1, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0 }];
       this.dir = { x: 1, y: 0 }; this.inputQ = [];
       this.score = 0; this.tick = 0; this.tickRate = 0.187; this.startDelay = 3.0;
-      this.deathBlocks = []; this.deathBlockFlash = []; this.tunnelPowerups = []; this.haloPowerups = [];
+      this.deathBlocks = []; this.deathBlockFlash = []; this.haloPowerups = [];
       this.wallEvents = []; this.portalPairs = []; this.crownPickups = [];
       this.crown = null;
       this.crownApplesEaten = 0; this.crownFreezeTicks = 0; this.crownUpgradeStartTime = -1;
       this.haloSaveAnim = null;
-      this.phaseTicks = 0; this.stepCount = 0; this.portalCooldown = 0;
-      this.tunnelCharges = 0; this.haloCharges = 0;
+      this.phaseTicks = 0; this.phaseCooldown = 0; this.stepCount = 0; this.portalCooldown = 0;
+      this.haloCharges = 0;
       this.particles = []; this.floatTexts = []; this.shakeMag = 0; this.portalTrail = null;
       this.died = false; this.newBest = false; this.deathExplosionPending = false;
       this.deathExplosionQueue = null; this.deathScreenReady = 0;
       this.spawnPortalPair();
       this.food = this.trySpawnFood(); this.foodSpawnTime = this.gTime;
-      this.trySpawn(0, COLS - 1, c => this.tunnelPowerups.push({ ...c, spawnTime: this.gTime }));
       this.tutorialMode = false;
       this.tutorialRestartPending = false;
       this.tutorialAppleEaten = false;
@@ -219,13 +214,13 @@ export function createEngine() {
       this.snakeDir = [{ x: 1, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 0 }];
       this.dir = { x: 1, y: 0 }; this.inputQ = [];
       this.score = 0; this.tick = 0; this.tickRate = 0.187; this.startDelay = 0;
-      this.deathBlocks = []; this.deathBlockFlash = []; this.tunnelPowerups = []; this.haloPowerups = [];
+      this.deathBlocks = []; this.deathBlockFlash = []; this.haloPowerups = [];
       this.wallEvents = []; this.portalPairs = []; this.crownPickups = [];
       this.crown = null;
       this.crownApplesEaten = 0; this.crownFreezeTicks = 0; this.crownUpgradeStartTime = -1;
       this.haloSaveAnim = null;
-      this.phaseTicks = 0; this.stepCount = 0; this.portalCooldown = 0;
-      this.tunnelCharges = 0; this.haloCharges = 0;
+      this.phaseTicks = 0; this.phaseCooldown = 0; this.stepCount = 0; this.portalCooldown = 0;
+      this.haloCharges = 0;
       this.particles = []; this.floatTexts = []; this.shakeMag = 0; this.portalTrail = null;
       this.died = false; this.newBest = false; this.deathExplosionPending = false;
       this.deathExplosionQueue = null; this.deathScreenReady = 0;
@@ -283,9 +278,9 @@ export function createEngine() {
     },
 
     activateTunnel() {
-      if (this.tunnelCharges > 0 && this.phaseTicks === 0) {
-        this.tunnelCharges--;
+      if (this.phaseCooldown === 0 && this.phaseTicks === 0) {
         this.phaseTicks = 10;
+        this.phaseCooldown = 20;
         sndTunnelActivate();
         return true;
       }
@@ -544,13 +539,6 @@ export function createEngine() {
       }
 
       // Collect powerups
-      for (let i = this.tunnelPowerups.length - 1; i >= 0; i--)
-        if (this.tunnelPowerups[i].x === head.x && this.tunnelPowerups[i].y === head.y) {
-          this.tunnelCharges++;
-          this.burst(head.x, head.y, 12, 30, 120, 3, 7, 0.3, 0.6, [C.PHASE_HEAD, [200, 240, 255], [255, 255, 255]]);
-          this.shakeMag = Math.max(this.shakeMag, 5);
-          this.tunnelPowerups.splice(i, 1); sndTunnelPickup(); break;
-        }
       for (let i = this.haloPowerups.length - 1; i >= 0; i--)
         if (this.haloPowerups[i].x === head.x && this.haloPowerups[i].y === head.y) {
           this.haloCharges++;
@@ -639,6 +627,7 @@ export function createEngine() {
       } else { this.snake.pop(); this.snakeGhost.pop(); this.snakeDir.pop(); }
 
       if (this.phaseTicks > 0) this.phaseTicks--;
+      if (this.phaseCooldown > 0) this.phaseCooldown--;
       this.stepCount++;
 
       // Record replay frame each tick
@@ -646,7 +635,6 @@ export function createEngine() {
 
       if (!this.tutorialMode) {
         if (this.stepCount % 50 === 0) this.trySpawnDeathBlock();
-        if (this.stepCount % 100 === 0) this.trySpawn(0, COLS - 1, c => { this.tunnelPowerups.push({ ...c, spawnTime: this.gTime }); sndTunnelSpawn(); });
         if (this.stepCount % 200 === 0) this.trySpawn(0, COLS - 1, c => { this.haloPowerups.push(c); sndHaloSpawn(); });
         if (this.stepCount > 0 && this.stepCount % 250 === 0) { this.spawnPortalPair(); sndPortalSpawn(); }
         if (this.stepCount > 0 && this.stepCount % 300 === 0) this.spawnWall();

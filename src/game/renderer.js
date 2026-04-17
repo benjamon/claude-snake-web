@@ -1,4 +1,4 @@
-import { COLS, ROWS, C, rgb, rgbA, brighten, darken } from './constants.js';
+import { COLS, ROWS, C, rgb, rgbA, brighten } from './constants.js';
 
 // Render a snapshot frame (used for replay playback)
 // Full-detail rendering matching the live game
@@ -114,24 +114,6 @@ function renderSnapshot(ctx, frame, layout, alpha, replayTime) {
       ctx.beginPath(); ctx.arc(cx, cy, lw, 0, Math.PI * 2); ctx.fill();
     };
     drawPortal(pp.a); drawPortal(pp.b);
-  }
-
-  // Tunnel powerups
-  if (frame.tunnelPowerups) for (const tp of frame.tunnelPowerups) {
-    const tBob = Math.sin(gt * 2.8 + tp.x * 1.1 + tp.y * 0.7) * (gCell * 0.105);
-    const cx = tp.x * gCell + gCell / 2, cy = tp.y * gCell + gCell / 2 + tBob;
-    const age = gt - (tp.spawnTime || 0);
-    const spawnT = Math.min(age / 0.6, 1);
-    const spawnSc = 3 - 2 * spawnT;
-    const pulse = (Math.sin(gt * 3.5 + tp.x * 0.7 + tp.y * 1.3) + 1) * 0.5;
-    const baseR = (gCell / 2 - 2) * spawnSc;
-    const ringR = baseR * (0.9 + pulse * 0.1);
-    const lw = Math.max(2, gCell / 7);
-    ctx.fillStyle = rgbA(darken(C.PHASE_HEAD, 0.8), 0.9);
-    ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = rgbA(C.PHASE_HEAD, 0.8 + pulse * 0.2);
-    ctx.lineWidth = lw;
-    ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.stroke();
   }
 
   // Halo powerups
@@ -488,26 +470,6 @@ export function renderGame(ctx, engine, layout) {
       ctx.beginPath(); ctx.arc(cx, cy, lw, 0, Math.PI * 2); ctx.fill();
     };
     drawPortal(pp.a); drawPortal(pp.b);
-  }
-
-  // Tunnel powerups
-  for (const tp of engine.tunnelPowerups) {
-    const tBob = Math.sin(engine.gTime * 2.8 + tp.x * 1.1 + tp.y * 0.7) * (gCell * 0.105);
-    const cx = tp.x * gCell + gCell / 2, cy = tp.y * gCell + gCell / 2 + tBob;
-    const age = engine.gTime - (tp.spawnTime || 0);
-    const spawnT = Math.min(age / 0.6, 1);
-    const spawnSc = 3 - 2 * spawnT;
-    const pulse = (Math.sin(engine.gTime * 3.5 + tp.x * 0.7 + tp.y * 1.3) + 1) * 0.5;
-    const baseR = (gCell / 2 - 2) * spawnSc;
-    const ringR = baseR * (0.9 + pulse * 0.1);
-    const lw = Math.max(2, gCell / 7);
-    // Dark fill matching phase color
-    ctx.fillStyle = rgbA(darken(C.PHASE_HEAD, 0.8), 0.9);
-    ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.fill();
-    // Bright ring
-    ctx.strokeStyle = rgbA(C.PHASE_HEAD, 0.8 + pulse * 0.2);
-    ctx.lineWidth = lw;
-    ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI * 2); ctx.stroke();
   }
 
   // Halo powerups

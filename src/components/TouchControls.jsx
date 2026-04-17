@@ -7,7 +7,7 @@ const DIRS = {
   right: { x: 1, y: 0 },
 };
 
-export default function TouchControls({ onDirection, onTunnel, tunnelCharges, highlightTunnel }) {
+export default function TouchControls({ onDirection, onTunnel, phaseCooldown, phaseTicks, highlightTunnel }) {
   const dpadRef = useRef(null);
 
   const handleDpadStart = useCallback((e) => {
@@ -34,7 +34,7 @@ export default function TouchControls({ onDirection, onTunnel, tunnelCharges, hi
     onTunnel();
   }, [onTunnel]);
 
-  const disabled = !tunnelCharges;
+  const disabled = phaseCooldown > 0 || phaseTicks > 0;
   const iconSize = '28%';
 
   return (
@@ -70,7 +70,7 @@ export default function TouchControls({ onDirection, onTunnel, tunnelCharges, hi
         onTouchStart={disabled ? undefined : handleTunnelStart}
         onPointerDown={(e) => { if (e.pointerType !== 'touch') return; e.preventDefault(); }}
       >
-        PHASE
+        {phaseCooldown > 0 && phaseTicks === 0 ? phaseCooldown : 'PHASE'}
       </button>
     </div>
   );

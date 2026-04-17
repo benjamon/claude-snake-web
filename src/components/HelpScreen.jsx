@@ -7,7 +7,7 @@ export default function HelpScreen({ onBack }) {
         <div className="help-section">
           <h2 className="help-heading">Phasing</h2>
           <p className="help-text">
-            Blue orbs = phase charges. <b>Space</b> to go ghost for 10 steps. Pass through everything. No growth while active.
+            <b>Space</b> to go ghost for 10 steps. Pass through everything. No growth while active. 20-step cooldown between uses.
           </p>
         </div>
 

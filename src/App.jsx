@@ -37,7 +37,6 @@ function applyTutorialStage(engine, stage) {
   const mx = COLS / 2 | 0, my = ROWS / 2 | 0;
   if (stage >= 1) {
     engine.growSnake(10);
-    engine.tunnelCharges = 5;
   }
   if (stage >= 2) {
     engine.addPortalPair(mx + 4, my, 2, 3, PORTAL_COLORS[0]);
@@ -355,9 +354,9 @@ export default function App() {
         {/* Side indicators during play */}
         {(state === S.PLAY || state === S.DEAD || state === S.TUTORIAL) && (
           <SideIndicators
-            tunnelCharges={engine.tunnelCharges}
-            haloCharges={engine.haloCharges}
+            phaseCooldown={engine.phaseCooldown}
             phaseTicks={engine.phaseTicks}
+            haloCharges={engine.haloCharges}
             layout={boardLayout}
           />
         )}
@@ -367,7 +366,8 @@ export default function App() {
           <TouchControls
             onDirection={handleSwipe}
             onTunnel={handleTunnel}
-            tunnelCharges={engine.tunnelCharges}
+            phaseCooldown={engine.phaseCooldown}
+            phaseTicks={engine.phaseTicks}
             highlightTunnel={state === S.TUTORIAL && tutStage === 1}
           />
         )}
