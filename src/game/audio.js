@@ -252,6 +252,22 @@ export function stopBgMusic() {
   if (bgTimer) { clearTimeout(bgTimer); bgTimer = null; }
 }
 
+// Soft pause: remembers whether music was playing so resumeBgMusic can restart it
+let bgWasRunning = false;
+export function pauseBgMusic() {
+  if (!bgRunning) return;
+  bgWasRunning = true;
+  bgRunning = false;
+  if (bgAudio && bgUsingFile) bgAudio.pause();
+  if (bgTimer) { clearTimeout(bgTimer); bgTimer = null; }
+}
+
+export function resumeBgMusic() {
+  if (!bgWasRunning) return;
+  bgWasRunning = false;
+  startBgMusic();
+}
+
 export function setSfxMuted(m) {
   sfxMuted = m;
   if (masterGain) masterGain.gain.value = m ? 0 : 0.45;

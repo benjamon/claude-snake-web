@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 
 import { PALETTES, applyPalette } from './game/constants.js';
-import { ensureAudio, startBgMusic } from './game/audio.js';
+import { ensureAudio, startBgMusic, pauseBgMusic, resumeBgMusic } from './game/audio.js';
 import { createEngine } from './game/engine.js';
 import { renderGame } from './game/renderer.js';
 import { useLeaderboard } from './hooks/useLeaderboard.js';
@@ -100,6 +100,17 @@ export default function App() {
     }, 50);
     return () => clearInterval(id);
   }, [state, playerName, leaderboard]);
+
+  // Mobile: pause music when backgrounded, resume when refocused
+  useEffect(() => {
+    if (!window.matchMedia('(pointer: coarse)').matches) return;
+    const onVisibility = () => {
+      if (document.hidden) pauseBgMusic();
+      else resumeBgMusic();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
 
   // Keyboard input
   useEffect(() => {
